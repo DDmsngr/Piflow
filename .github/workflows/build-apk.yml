@@ -1,0 +1,57 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Flutter 3.44.8
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.8'
+          channel: stable
+          cache: true
+
+      - name: Show Flutter version
+        run: flutter --version
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build release APK (unsigned)
+        run: flutter build apk --release --no-tree-shake-icons
+
+      - name: Rename APK for clarity
+        run: |
+          mkdir -p artifacts
+          cp build/app/outputs/flutter-apk/app-release.apk artifacts/piflow-${{ github.sha }}.apk
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: piflow-apk
+          path: artifacts/piflow-*.apk
+          retention-days: 30
+
+      - name: Upload APK to workflow summary
+        run: |
+          size_mb=$(du -m artifacts/*.apk | cut -f1)
+          echo "## 📦 APK готов" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Размер:** ${size_mb} MB" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Скачай из секции **Artifacts** этого запуска (кнопка сверху)." >> $GITHUB_STEP_SUMMARY
+          echo "APK debug-signed (для install и теста; для RuStore нужен keystore)." >> $GITHUB_STEP_SUMMARY
