@@ -11,6 +11,7 @@ import 'package:flutter/services.dart';
 import 'achievements.dart';
 import 'audio.dart';
 import 'models.dart';
+import 'scoring.dart';
 import 'skins.dart';
 
 /// Snapshot of transient in-game FX for the HUD overlay to render.
@@ -104,20 +105,79 @@ class PixelFlowGame extends FlameGame with HasCollisionDetection {
   int shotsFired = 0;
   int combosTriggered = 0;
 
-  /// Compute stars + score for the just-finished level.
-  ///  - 3★ if shots ≤ 1.2 × totalBlocks
-  ///  - 2★ if shots ≤ 1.7 × totalBlocks
-  ///  - 1★ otherwise (any completion earns at least one star)
-  /// score = 100 base + [50, 100, 150] per star + 10 per combo triggered.
+  // Puzzle-mode play stats (2026-08-11 redesign).
+  int launchesMade = 0;
+  int launchedAmmoPool = 0;
+  final Set<PiggyColor> launchedColors = <PiggyColor>{};
+  final List<PiggyColor> launchedSequence = <PiggyColor>[];
+
+  /// Called by [PiggyComponent.onTapDown] whenever a piggy leaves the queue
+  /// (whether to belt or via direct queue→waiting transfer). Both count as a
+  /// "launch" per the design contract — dead-color transfers must be punished
+  /// too (see L3 tutorial).
+  void recordLaunch(PiggyComponent p) {
+    launchesMade++;
+    launchedAmmoPool += p.ammo;
+    launchedColors.add(p.piggyColor);
+    launchedSequence.add(p.piggyColor);
+  }
+
+  /// Legacy result — kept for the current [game_screen.dart] star overlay
+  /// during transition. New puzzle-mode UI uses [computeLevelResult].
   ({int stars, int score}) computeResult() {
     final total = level.totalBlocks;
     final ratio = total == 0 ? 1.0 : shotsFired / total;
     final int stars = ratio <= 1.2 ? 3 : (ratio <= 1.7 ? 2 : 1);
     const perStar = [0, 50, 100, 150];
-    // 3-star runs earn a 2× multiplier — perfect play should feel great.
     final base = 100 + perStar[stars] + combosTriggered * 10;
     final score = stars >= 3 ? base * 2 : base;
     return (stars: stars, score: score);
+  }
+
+  /// Full puzzle-mode evaluation. Called by the result-overlay UI after WIN
+  /// or arsenal-exhaustion. Returns a [LevelResult] with rank, deviation
+  /// bars, checklist, and motivational hint.
+  ///
+  /// [cleared] must reflect the actual board state at end-of-level — true if
+  /// every destructible block is gone, false if arsenal ran out first.
+  LevelResult computeLevelResult({required bool cleared}) {
+    // unused ammo across LAUNCHED piggies still alive (leaving + waiting +
+    // belt). Un-launched piggies (still in queue) do NOT count — spare, not
+    // waste. See scoring.dart docstring.
+    var unused = 0;
+    for (final p in world.children.whereType<PiggyComponent>()) {
+      if (p.state == PiggyState.inQueue) continue;
+      if (p.ammo > 0) unused += p.ammo;
+    }
+    // For consistency with launchedAmmoPool - shotsFired: the game engine's
+    // per-piggy ammo counter is decremented only on real shots, so the sum
+    // above == launchedAmmoPool - shotsFired for still-alive piggies. But
+    // some piggies may have been GC'd (removed after leaving). We fall back
+    // to the pool-minus-shots formula which is invariant.
+    final poolFormula = (launchedAmmoPool - shotsFired).clamp(0, 1 << 30);
+    final unusedAmmo = poolFormula > unused ? poolFormula : unused;
+
+    final cfg = LevelTargetConfig(
+      targetLaunches: level.targetLaunches ?? level.arsenalCount,
+      targetHits: level.effectiveTargetHits,
+      allowedColors: level.boardColors,
+      expectedCombos: level.expectedCombos,
+      softLaunchTolerance: level.softLaunchTolerance,
+      failLaunchOverflow: level.failLaunchOverflow,
+      perfectLaunchTolerance: level.perfectLaunchTolerance,
+      masteryChallenge: level.masteryChallenge,
+    );
+    final stats = ActualPlayStats(
+      launchesMade: launchesMade,
+      shotsFired: shotsFired,
+      unusedAmmo: unusedAmmo,
+      colorsUsed: launchedColors,
+      combosTriggered: combosTriggered,
+      actualSequence:
+          level.inventory == null ? null : List<PiggyColor>.from(launchedSequence),
+      cleared: cleared,
+    );
+    return const LevelScorer().evaluate(cfg, stats);
   }
 
   static const double worldWidth = 400;
@@ -227,7 +287,8 @@ class PixelFlowGame extends FlameGame with HasCollisionDetection {
     slots = WaitingSlotsComponent(area: slotsRect, count: level.waitingSlots);
     world.add(slots);
 
-    // Queue at bottom — auto-spawns random piggies from the level's palette.
+    // Queue at bottom — puzzle mode pulls from the pre-loaded arsenal FIFO;
+    // legacy mode still uses the weighted RNG spawner.
     final queueRect = Rect.fromLTWH(20, worldHeight - 170, worldWidth - 40, 70);
     piggyQueue = QueueComponent(
       area: queueRect,
@@ -237,6 +298,7 @@ class PixelFlowGame extends FlameGame with HasCollisionDetection {
       palette: level.spawnPalette,
       ammoMin: level.ammoMin,
       ammoMax: level.ammoMax,
+      arsenal: level.inventory,
     );
     world.add(piggyQueue);
   }
@@ -453,10 +515,25 @@ class PixelFlowGame extends FlameGame with HasCollisionDetection {
       return;
     }
 
-    // Fail-detect: throttle to twice a second — cheap but not per-frame.
+    // End-detect: throttle to twice a second.
     _loseCheckTimer -= dt;
     if (_loseCheckTimer <= 0) {
       _loseCheckTimer = 0.5;
+      // Puzzle mode: soft end when arsenal drained AND no more piggies alive
+      // AND board still has blocks. No STUCK screen — result overlay carries
+      // the drama via rank D + retry (per Aleksey 2026-08-11).
+      if (level.isPuzzleMode) {
+        if (_isArsenalOut() || _isPuzzleStuck()) {
+          _finished = true;
+          AudioService.lose();
+          Future.delayed(const Duration(milliseconds: 500), () {
+            if (!_finished || onLose == null) return;
+            onLose!();
+          });
+        }
+        return;
+      }
+      // Legacy mode keeps the old hard STUCK detection.
       if (_isStuck()) {
         _finished = true;
         AudioService.lose();
@@ -466,6 +543,50 @@ class PixelFlowGame extends FlameGame with HasCollisionDetection {
         });
       }
     }
+  }
+
+  /// Puzzle-mode end: FIFO pool empty AND no piggy left in queue/waiting/belt
+  /// that could still shoot something. Blocks remain (otherwise we'd have
+  /// won earlier in this same tick).
+  bool _isArsenalOut() {
+    if (!piggyQueue.isArsenalExhausted) return false;
+    for (final p in world.children.whereType<PiggyComponent>()) {
+      if (p.state == PiggyState.leaving) continue;
+      // Any live piggy anywhere = play continues.
+      return false;
+    }
+    return true;
+  }
+
+  /// Puzzle-mode early game-over: FIFO pool empty AND every live piggy is
+  /// useless against the remaining board (colour mismatch, ammo=0, no
+  /// specials). Waiting-slot has no rescue value here — the spawner is
+  /// permanently silent so a free slot doesn't refill. Trigger the lose
+  /// overlay immediately instead of making the player wait through empty
+  /// belt-laps until the last piggy times out.
+  bool _isPuzzleStuck() {
+    if (!piggyQueue.isArsenalExhausted) return false;
+
+    final aliveColors = <PiggyColor>{};
+    var hasAnyBlock = false;
+    for (final row in board.cells) {
+      for (final b in row) {
+        if (b == null || b.spec.isStone || b.spec.isPortal || b.isBeingRemoved) continue;
+        hasAnyBlock = true;
+        final c = b.currentColor;
+        if (c != null) aliveColors.add(c);
+      }
+    }
+    if (!hasAnyBlock) return false; // caught by win-check upstream
+
+    for (final p in world.children.whereType<PiggyComponent>()) {
+      if (p.state == PiggyState.leaving) continue;
+      if (p.ammo <= 0) continue;
+      if (p.type.isSpecial) return false;
+      if (aliveColors.contains(p.piggyColor)) return false;
+      if (universalColor != null && p.piggyColor == universalColor) return false;
+    }
+    return true;
   }
 
   /// Stuck rule (per Alexey 2026-08-10): "count only the piggies in the
@@ -846,8 +967,13 @@ class BlockComponent extends PositionComponent {
   SpriteComponent? _bodySprite;
 
   /// Colour a piggy needs to shoot this block right now (null for stone).
+  /// Accounts for [_plannedHits] — in-flight balls that will land in the
+  /// future. Otherwise a Y-piggy shoots into a dual _yg, reserves 1 hit
+  /// (hp still = 2 until the ball arrives), sees currentColor == Y again
+  /// on the next cooldown and fires a wasted Y-shot into what's already
+  /// virtually inner=G. Same story for color-shift YOP.
   PiggyColor? get currentColor =>
-      _paintOverride ?? spec.currentColor(hp);
+      _paintOverride ?? spec.currentColor(math.max(0, hp - _plannedHits));
 
   /// Painter/duplicator/converter: change this block's colour on the fly.
   /// Skips stone/portal (unchanged) and blocks already popping. Resets
@@ -935,9 +1061,15 @@ class BlockComponent extends PositionComponent {
       return;
     }
 
-    // Dual: after the first hit, expose the inner colour by swapping sprite.
-    if (spec.innerColor != null && hp == maxHp - 1) {
-      _bodySprite?.sprite = spriteFor(spec.innerColor!);
+    // Swap sprite to reflect the new current colour after damage.
+    //   - Dual (innerColor set): hp = maxHp-1 exposes innerColor.
+    //   - Color-shift (colorShiftStates set): every hit shifts to next state.
+    //   - Repainted (_paintOverride set): sprite stays as override.
+    if (_paintOverride == null) {
+      final nextColor = spec.currentColor(hp);
+      if (nextColor != null) {
+        _bodySprite?.sprite = spriteFor(nextColor);
+      }
     }
 
     // Lighten the tint as damage is taken (armored blocks visibly weaken).
@@ -1650,11 +1782,14 @@ class PiggyComponent extends PositionComponent with TapCallbacks {
       // Path A: useful colour (or special) → launch to belt.
       if (game.tryLaunchPiggy(this)) {
         AudioService.click();
+        game.recordLaunch(this);
         game.piggyQueue.removePiggy(this);
         return;
       }
       // Path B: useless colour but waiting has room → park her directly there.
       // Frees the queue slot for a fresh spawn without wasting a belt lap.
+      // Still counts as a launch (piggy exited the arsenal — dead-color
+      // transfers are supposed to hurt the L3 rank).
       final iCouldBeUseful = type.isSpecial || game.board.hasBlockOfColor(piggyColor);
       if (!iCouldBeUseful && game.slots.hasFreeSlot &&
           game.queueLaunchBlockReason() != 'slots-full') {
@@ -1688,6 +1823,7 @@ class PiggyComponent extends PositionComponent with TapCallbacks {
     }
     _transferring = true;
     AudioService.click();
+    game.recordLaunch(this);
     game.piggyQueue.removePiggy(this);
     slot.piggy = this;
     state = PiggyState.inSlot;
@@ -2231,6 +2367,7 @@ class QueueComponent extends PositionComponent {
     required this.palette,
     required this.ammoMin,
     required this.ammoMax,
+    this.arsenal,
   }) {
     position = Vector2(area.left, area.top);
     size = Vector2(area.width, area.height);
@@ -2244,7 +2381,13 @@ class QueueComponent extends PositionComponent {
   final int ammoMin;
   final int ammoMax;
 
+  /// Non-null → puzzle mode. Spawner pulls piggies from this pre-loaded
+  /// FIFO pool in bundle-declaration order. When the pool empties, the
+  /// spawner stops (no more piggies will appear).
+  final List<PiggyBundle>? arsenal;
+
   late final List<PiggyComponent?> _slots;
+  late final List<_ArsenalPick> _pool;
   double _spawnTimer = 0;
   // Microsecond seed: every restart of the same level rolls a different
   // colour sequence, so retries don't feel like the same puzzle twice.
@@ -2253,9 +2396,23 @@ class QueueComponent extends PositionComponent {
   PiggyColor? _lastColor;
   int _sameColorStreak = 0;
 
+  bool get isPuzzleMode => arsenal != null;
+
+  /// Puzzle-only: true when the FIFO pool is fully drained. Used by the game
+  /// end-of-level detector to decide when to fire the result overlay.
+  bool get isArsenalExhausted => isPuzzleMode && _pool.isEmpty;
+
   @override
   Future<void> onLoad() async {
     _slots = List.filled(slotCount, null);
+    _pool = <_ArsenalPick>[];
+    if (arsenal != null) {
+      for (final b in arsenal!) {
+        for (var i = 0; i < b.count; i++) {
+          _pool.add(_ArsenalPick(color: b.color, ammo: b.ammo, type: b.type));
+        }
+      }
+    }
     // Prefill so the player has a piggy to tap immediately.
     _spawnInto(0, animated: false);
   }
@@ -2304,6 +2461,9 @@ class QueueComponent extends PositionComponent {
   void _spawnNext() {
     final freeIdx = _slots.indexWhere((p) => p == null);
     if (freeIdx == -1) return; // queue is full — blocked
+    if (isPuzzleMode && _pool.isEmpty && game.pendingRewardType == null) {
+      return; // arsenal drained, no reward pending — nothing to spawn
+    }
     _spawnInto(freeIdx, animated: true);
   }
 
@@ -2344,6 +2504,12 @@ class QueueComponent extends PositionComponent {
   }
 
   void _spawnInto(int idx, {required bool animated}) {
+    // Never overwrite an occupied slot — the caller (usually _spawnNext) should
+    // have found a free index first. If we ever hit this the previous pig would
+    // be orphaned in the world at the same target position, which is the "two
+    // pigs in one slot" bug the user reported for L2.
+    if (_slots[idx] != null) return;
+
     // Consume a pending combo reward if we have one.
     PiggyType type = PiggyType.normal;
     if (game.pendingRewardType != null) {
@@ -2352,11 +2518,24 @@ class QueueComponent extends PositionComponent {
       game.notePendingRewardConsumed();
     }
 
-    final color = _pickColor();
-    // Special piggies get a bit less ammo so they don't trivialise the level.
-    final maxAmmo = type.isSpecial ? math.min(8, ammoMax) : ammoMax;
-    final minAmmo = type.isSpecial ? math.min(3, ammoMin) : ammoMin;
-    final ammo = minAmmo + _rng.nextInt(math.max(1, maxAmmo - minAmmo + 1));
+    final PiggyColor color;
+    final int ammo;
+    if (isPuzzleMode && type == PiggyType.normal) {
+      if (_pool.isEmpty) return; // guard — shouldn't reach here, _spawnNext checks
+      final pick = _pool.removeAt(0);
+      color = pick.color;
+      ammo = pick.ammo;
+      // A bundle can pre-load a special (filter/bomb/rainbow/…) into the
+      // puzzle inventory; when we pull one, its type wins over the default
+      // PiggyType.normal set above.
+      type = pick.type;
+    } else {
+      color = _pickColor();
+      // Special piggies get a bit less ammo so they don't trivialise the level.
+      final maxAmmo = type.isSpecial ? math.min(8, ammoMax) : ammoMax;
+      final minAmmo = type.isSpecial ? math.min(3, ammoMin) : ammoMin;
+      ammo = minAmmo + _rng.nextInt(math.max(1, maxAmmo - minAmmo + 1));
+    }
 
     final target = _slotPosition(idx);
     final start = animated
@@ -2375,10 +2554,15 @@ class QueueComponent extends PositionComponent {
       p.add(MoveToEffect(
         target,
         EffectController(duration: 0.35, curve: Curves.easeOut),
-        // Snap-lock the final position — if another effect (compact, direct
-        // transfer) fires while this one is still animating, the snap
-        // guarantees the piggy ends at the queue slot, not mid-air.
-        onComplete: () => p.position.setFrom(target),
+        // Snap-lock to the CURRENT logical slot position, not the closed-over
+        // `target`. If _compact moved this piggy to a different slot while the
+        // spawn animation was still running, the closure would otherwise snap
+        // her back to the original slot on top of a freshly spawned piggy —
+        // that's the "two pigs in one slot" bug.
+        onComplete: () {
+          final curIdx = _slots.indexOf(p);
+          if (curIdx >= 0) p.position.setFrom(_slotPosition(curIdx));
+        },
       ));
     }
   }
@@ -2411,9 +2595,20 @@ class QueueComponent extends PositionComponent {
         if (writeIdx != i) {
           _slots[writeIdx] = p;
           _slots[i] = null;
+          // Kill any in-flight MoveToEffect (from a still-running spawn or
+          // an earlier compact) — otherwise their onComplete snap-lock
+          // yanks the piggy back to a stale target and stacks two piggies
+          // at the same visual point.
+          for (final e in p.children.whereType<MoveToEffect>().toList()) {
+            e.removeFromParent();
+          }
           p.add(MoveToEffect(
             _slotPosition(writeIdx),
             EffectController(duration: 0.22, curve: Curves.easeOut),
+            onComplete: () {
+              final curIdx = _slots.indexOf(p);
+              if (curIdx >= 0) p.position.setFrom(_slotPosition(curIdx));
+            },
           ));
         }
         writeIdx++;
@@ -2423,6 +2618,19 @@ class QueueComponent extends PositionComponent {
 
   /// Index of a piggy in the queue, or -1 if not present.
   int indexOf(PiggyComponent p) => _slots.indexOf(p);
+}
+
+/// One entry in the puzzle-mode arsenal pool. Bundles are unrolled into
+/// picks at level start so FIFO order matches inventory declaration order.
+class _ArsenalPick {
+  final PiggyColor color;
+  final int ammo;
+  final PiggyType type;
+  const _ArsenalPick({
+    required this.color,
+    required this.ammo,
+    this.type = PiggyType.normal,
+  });
 }
 
 // ------------------------------------------------------------

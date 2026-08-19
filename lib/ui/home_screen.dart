@@ -29,6 +29,11 @@ class _HomeScreenState extends State<HomeScreen> {
   final Map<int, int> _starsPerLevel = {};
   bool _loading = true;
 
+  // Dev-cheat: 6 taps on the PiFlow title within 3 seconds unlocks every
+  // level so we can jump straight to the last-added ones for testing.
+  int _titleTaps = 0;
+  DateTime? _firstTapAt;
+
   @override
   void initState() {
     super.initState();
@@ -562,23 +567,51 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _titleBadge() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF224F73),
-        borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: Colors.black.withValues(alpha: 0.4), width: 3),
-      ),
-      child: const Text(
-        'PiFlow',
-        style: TextStyle(
-          fontSize: 34,
-          fontWeight: FontWeight.w900,
-          color: Colors.white,
-          letterSpacing: 1.2,
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: _onTitleTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF224F73),
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(color: Colors.black.withValues(alpha: 0.4), width: 3),
+        ),
+        child: const Text(
+          'PiFlow',
+          style: TextStyle(
+            fontSize: 34,
+            fontWeight: FontWeight.w900,
+            color: Colors.white,
+            letterSpacing: 1.2,
+          ),
         ),
       ),
     );
+  }
+
+  Future<void> _onTitleTap() async {
+    final now = DateTime.now();
+    if (_firstTapAt == null ||
+        now.difference(_firstTapAt!) > const Duration(seconds: 3)) {
+      _firstTapAt = now;
+      _titleTaps = 1;
+      return;
+    }
+    _titleTaps++;
+    if (_titleTaps < 6) return;
+    _titleTaps = 0;
+    _firstTapAt = null;
+    final last = levels.isEmpty ? 0 : levels.last.levelNumber;
+    await Progress.unlockAllLevels(last);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Dev-режим: разблокированы уровни 1–$last'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+    _load();
   }
 }
 

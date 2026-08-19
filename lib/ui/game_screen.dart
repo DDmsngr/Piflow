@@ -6,6 +6,7 @@ import '../game/levels.dart';
 import '../game/models.dart';
 import '../game/pixel_flow_game.dart';
 import '../game/progress.dart';
+import '../game/scoring.dart';
 import 'achievements_screen.dart' show showAchievementToasts;
 
 class GameScreen extends StatefulWidget {
@@ -25,6 +26,10 @@ class _GameScreenState extends State<GameScreen> {
   int _lastStars = 0;
   int _lastScore = 0;
 
+  /// Puzzle-mode result (stars, moves/shots/colors/mastery). Null for
+  /// legacy-mode levels — those still use the old star overlay.
+  LevelResult? _lastResult;
+
   @override
   void initState() {
     super.initState();
@@ -36,6 +41,7 @@ class _GameScreenState extends State<GameScreen> {
     _end = _EndKind.none;
     _lastStars = 0;
     _lastScore = 0;
+    _lastResult = null;
     game = PixelFlowGame(
       level: levels[levelIndex],
       onWin: _onWin,
@@ -46,20 +52,40 @@ class _GameScreenState extends State<GameScreen> {
   Future<void> _onWin() async {
     if (_end != _EndKind.none) return;
     final level = levels[levelIndex];
-    final result = game.computeResult();
     await Progress.markCompleted(level.levelNumber);
-    await Progress.saveResult(
-      levelNumber: level.levelNumber,
-      stars: result.stars,
-      score: result.score,
-    );
-    await _checkLevelAchievements(level, result);
-    if (!mounted) return;
-    setState(() {
-      _lastStars = result.stars;
-      _lastScore = result.score;
-      _end = _EndKind.win;
-    });
+
+    if (level.isPuzzleMode) {
+      final r = game.computeLevelResult(cleared: true);
+      final stars = r.stars;
+      final score = r.finalScore.round();
+      await Progress.saveResult(
+        levelNumber: level.levelNumber,
+        stars: stars,
+        score: score,
+      );
+      await _checkLevelAchievements(level, (stars: stars, score: score));
+      if (!mounted) return;
+      setState(() {
+        _lastResult = r;
+        _lastStars = stars;
+        _lastScore = score;
+        _end = _EndKind.win;
+      });
+    } else {
+      final result = game.computeResult();
+      await Progress.saveResult(
+        levelNumber: level.levelNumber,
+        stars: result.stars,
+        score: result.score,
+      );
+      await _checkLevelAchievements(level, result);
+      if (!mounted) return;
+      setState(() {
+        _lastStars = result.stars;
+        _lastScore = result.score;
+        _end = _EndKind.win;
+      });
+    }
     // Drain any newly-unlocked achievements into snackbars over the overlay.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) showAchievementToasts(context);
@@ -102,6 +128,18 @@ class _GameScreenState extends State<GameScreen> {
 
   void _onLose() {
     if (_end != _EndKind.none) return;
+    final level = levels[levelIndex];
+    if (level.isPuzzleMode) {
+      final r = game.computeLevelResult(cleared: false);
+      if (!mounted) return;
+      setState(() {
+        _lastResult = r;
+        _lastStars = 0;
+        _lastScore = 0;
+        _end = _EndKind.lose;
+      });
+      return;
+    }
     if (!mounted) return;
     setState(() => _end = _EndKind.lose);
   }
@@ -186,8 +224,14 @@ class _GameScreenState extends State<GameScreen> {
                 ),
               ),
             ),
-            if (_end == _EndKind.win) _winOverlay(isLast),
-            if (_end == _EndKind.lose) _loseOverlay(),
+            if (_end == _EndKind.win)
+              _lastResult != null
+                  ? _puzzleResultOverlay(_lastResult!, cleared: true, isLast: isLast)
+                  : _winOverlay(isLast),
+            if (_end == _EndKind.lose)
+              _lastResult != null
+                  ? _puzzleResultOverlay(_lastResult!, cleared: false, isLast: isLast)
+                  : _loseOverlay(),
           ],
         ),
       ),
@@ -355,6 +399,97 @@ class _GameScreenState extends State<GameScreen> {
       rightLabel: 'RETRY',
       rightColor: const Color(0xFFFF9438),
       rightAction: _restart,
+    );
+  }
+
+  // ── Puzzle-mode result overlay (2026-08-12 rewrite) ─────────────────────
+  //  Aleksey's spec: 3 звезды + Ходы/Выстрелы/Цвета/Мастерство + Цели уровня
+  //  + Итог. Никаких Par/S/SS/equality/Ammo.
+  //  UI reads LevelResult exclusively — все данные уже в r.
+  Widget _puzzleResultOverlay(
+    LevelResult r, {
+    required bool cleared,
+    required bool isLast,
+  }) {
+    return Positioned.fill(
+      child: Container(
+        color: Colors.black.withValues(alpha: 0.62),
+        alignment: Alignment.center,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
+            constraints: const BoxConstraints(maxWidth: 380),
+            decoration: BoxDecoration(
+              color: cleared ? const Color(0xFF224F73) : const Color(0xFF4A3A55),
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: Colors.black.withValues(alpha: 0.4), width: 3),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  cleared ? 'УРОВЕНЬ ПРОЙДЕН!' : 'Уровень не пройден',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: cleared ? 22 : 18,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white.withValues(alpha: cleared ? 1.0 : 0.85),
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                _StarsRow(earned: r.stars),
+                const SizedBox(height: 18),
+                _StatsBlock(result: r),
+                const SizedBox(height: 16),
+                _GoalsBlock(result: r),
+                const SizedBox(height: 14),
+                _VerdictBlock(text: r.motivationalHint),
+                if (cleared && r.finalScore > 0) ...[
+                  const SizedBox(height: 14),
+                  Text(
+                    '+${r.finalScore.round()} ОЧКОВ',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFFFFD338),
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 18),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _bigButton(
+                      label: 'MENU',
+                      color: const Color(0xFF3B7CB3),
+                      onTap: _backToMenu,
+                    ),
+                    const SizedBox(width: 10),
+                    _bigButton(
+                      label: 'RETRY',
+                      color: const Color(0xFFFF9438),
+                      onTap: _restart,
+                    ),
+                    if (cleared) ...[
+                      const SizedBox(width: 10),
+                      _bigButton(
+                        label: isLast ? 'DONE' : 'NEXT',
+                        color: const Color(0xFF6ECF3A),
+                        onTap: _nextLevel,
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -704,6 +839,272 @@ class _ComboFlash extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+// ── Puzzle-mode result overlay support widgets (2026-08-12 rewrite) ────────
+
+/// Three stars, filled/hollow based on earned count (0-3).
+class _StarsRow extends StatelessWidget {
+  const _StarsRow({required this.earned});
+  final int earned;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(3, (i) {
+        final on = i < earned;
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          child: Icon(
+            on ? Icons.star_rounded : Icons.star_outline_rounded,
+            size: 52,
+            color: on ? const Color(0xFFFFD338) : Colors.white38,
+          ),
+        );
+      }),
+    );
+  }
+}
+
+/// Stats block: Ходы / Выстрелы / Цвета / Мастерство (each = label + main + status).
+class _StatsBlock extends StatelessWidget {
+  const _StatsBlock({required this.result});
+  final LevelResult result;
+
+  @override
+  Widget build(BuildContext context) {
+    final r = result;
+    final movesOverflow = r.launchOverflow;
+    final String movesStatus;
+    if (movesOverflow == 0) {
+      movesStatus = 'Цель выполнена';
+    } else if (movesOverflow > 0) {
+      movesStatus = '+$movesOverflow ходов к цели';
+    } else {
+      movesStatus = 'На ${-movesOverflow} лучше цели';
+    }
+
+    final colorsRequired = r.colorsRequired.length;
+    final colorsUsed = r.colorsUsed.intersection(r.colorsRequired).length;
+    final colorsExtra = r.extraColors.length;
+    final String colorsStatus;
+    if (colorsExtra > 0) {
+      colorsStatus = 'Лишний цвет: $colorsExtra';
+    } else if (colorsUsed >= colorsRequired) {
+      colorsStatus = 'Выполнено';
+    } else {
+      colorsStatus = 'Не хватает: ${colorsRequired - colorsUsed}';
+    }
+
+    final String masteryLabel;
+    final String masteryStatus;
+    if (r.masteryLabel != null && r.masteryPassed != null) {
+      masteryLabel = r.masteryLabel!;
+      masteryStatus = r.masteryPassed! ? 'Выполнено' : 'Не выполнено';
+    } else {
+      masteryLabel = 'Без лишних выстрелов';
+      masteryStatus = r.unusedAmmo == 0 ? 'Выполнено' : 'Не выполнено';
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _StatRow(
+          label: 'Ходы',
+          main: '${r.movesUsed} / ${r.movesTarget}',
+          status: movesStatus,
+          ok: movesOverflow <= 0,
+        ),
+        _StatRow(
+          label: 'Выстрелы',
+          main: 'Использовано: ${r.shotsUsed}',
+          status: 'Осталось: ${r.unusedAmmo}',
+          ok: r.unusedAmmo == 0,
+        ),
+        _StatRow(
+          label: 'Цвета',
+          main: '$colorsUsed / $colorsRequired',
+          status: colorsStatus,
+          ok: colorsExtra == 0 && colorsUsed >= colorsRequired,
+        ),
+        _StatRow(
+          label: 'Мастерство',
+          main: masteryLabel,
+          status: masteryStatus,
+          ok: masteryStatus == 'Выполнено',
+        ),
+      ],
+    );
+  }
+}
+
+/// One row of the stats block. Label left, main value mid, status right.
+class _StatRow extends StatelessWidget {
+  const _StatRow({
+    required this.label,
+    required this.main,
+    required this.status,
+    required this.ok,
+  });
+  final String label;
+  final String main;
+  final String status;
+  final bool ok;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              color: Colors.white70,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.6,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Text(
+                  main,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                status,
+                textAlign: TextAlign.right,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: ok ? const Color(0xFF6ECF3A) : const Color(0xFFFFA07A),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// "ЦЕЛИ УРОВНЯ" — 3 goals (main / target / mastery) with tick/circle.
+class _GoalsBlock extends StatelessWidget {
+  const _GoalsBlock({required this.result});
+  final LevelResult result;
+
+  @override
+  Widget build(BuildContext context) {
+    final r = result;
+    final masteryLabel = r.masteryLabel ?? 'Без лишних выстрелов';
+    final masteryDone = r.masteryPassed ?? (r.unusedAmmo == 0);
+    final items = <(String, bool)>[
+      ('Уничтожить все кубики', r.checklist.cleared),
+      ('Уложиться в ${r.movesTarget} ходов', r.launchOverflow <= 0),
+      (masteryLabel, masteryDone),
+    ];
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.28),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'ЦЕЛИ УРОВНЯ',
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.white70,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 6),
+          ...items.map((it) {
+            final (label, ticked) = it;
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Row(
+                children: [
+                  Icon(
+                    ticked ? Icons.check_circle_rounded : Icons.circle_outlined,
+                    size: 16,
+                    color: ticked ? const Color(0xFF6ECF3A) : Colors.white38,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: ticked ? Colors.white : Colors.white60,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
+
+/// "ИТОГ" — motivational hint from scorer.
+class _VerdictBlock extends StatelessWidget {
+  const _VerdictBlock({required this.text});
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.28),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'ИТОГ',
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.white70,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            text,
+            style: const TextStyle(
+              fontSize: 13,
+              color: Colors.white,
+              fontWeight: FontWeight.w500,
+              height: 1.35,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

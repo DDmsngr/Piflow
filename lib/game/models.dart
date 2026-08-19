@@ -55,6 +55,27 @@ enum PiggyType {
   bool get isSpecial => this != PiggyType.normal;
 }
 
+/// Puzzle-mode mastery challenge — the "third star" of a level. Each level
+/// declares zero or one challenge; the scorer evaluates it against
+/// [ActualPlayStats]. Kept in models.dart (not scoring.dart) so LevelConfig
+/// can hold it without creating a cyclic import.
+enum MasteryKind {
+  /// stats.unusedAmmo == 0 — every launched piggy emptied its ammo. Spare
+  /// piggies left in the queue (never launched) do NOT count as waste.
+  noWastedShots,
+}
+
+class MasteryChallenge {
+  final MasteryKind kind;
+  final String label;
+  const MasteryChallenge({required this.kind, required this.label});
+
+  static const noWastedShots = MasteryChallenge(
+    kind: MasteryKind.noWastedShots,
+    label: 'Без лишних выстрелов',
+  );
+}
+
 /// A single cell on the board.
 ///
 /// - normal:  `BlockSpec(color: X)` — 1 hit of colour X kills it.
@@ -71,7 +92,16 @@ enum PiggyType {
 class BlockSpec {
   final PiggyColor? color;      // null iff stone/portal
   final int hp;
-  final PiggyColor? innerColor; // exposed after hp drops below max
+  final PiggyColor? innerColor; // legacy: 2-state dual (outer→inner)
+  /// N-state color-shift (2026-08-12). Each hit shifts to the next colour;
+  /// the last state kills the block. When set, [hp] MUST equal states.length
+  /// and [color] MUST equal states[0]. Ignores [innerColor].
+  ///
+  /// Example: `colorShiftStates: [yellow, orange, pink], hp: 3, color: yellow`
+  ///   hit 1 (Y-piggy): sprite → orange, hp=2
+  ///   hit 2 (O-piggy): sprite → pink, hp=1
+  ///   hit 3 (P-piggy): dies
+  final List<PiggyColor>? colorShiftStates;
   final bool isStone;
   final bool isPortal;
   /// Group id for portals — two BlockSpec.portal(id) instances with the same
@@ -82,6 +112,7 @@ class BlockSpec {
     this.color,
     this.hp = 1,
     this.innerColor,
+    this.colorShiftStates,
   })  : isStone = false,
         isPortal = false,
         portalPairId = -1;
@@ -90,6 +121,7 @@ class BlockSpec {
       : color = null,
         hp = 1,
         innerColor = null,
+        colorShiftStates = null,
         isStone = true,
         isPortal = false,
         portalPairId = -1;
@@ -100,6 +132,7 @@ class BlockSpec {
       : color = null,
         hp = 1,
         innerColor = null,
+        colorShiftStates = null,
         isStone = false,
         isPortal = true,
         portalPairId = pairId;
@@ -109,18 +142,81 @@ class BlockSpec {
   bool get blocksShotLine => isStone;
 
   /// The colour a piggy needs right now to hit this block.
-  /// For dual blocks whose outer layer is broken, this is [innerColor].
-  /// For stone/portal — null (cannot be shot).
+  /// For color-shift blocks, indexed from states[]. For dual blocks whose
+  /// outer layer is broken, this is [innerColor]. For stone/portal — null.
   PiggyColor? currentColor(int currentHp) {
     if (isStone || isPortal) return null;
+    if (colorShiftStates != null) {
+      // hp counts down from states.length → 1. State index = length - currentHp.
+      final idx = colorShiftStates!.length - currentHp;
+      if (idx < 0 || idx >= colorShiftStates!.length) return null;
+      return colorShiftStates![idx];
+    }
     if (innerColor != null && currentHp < hp) return innerColor;
     return color;
   }
 }
 
+/// One "bundle" in the puzzle-mode arsenal: N piggies of the same color, each
+/// carrying [ammo] shots. The arsenal is a `List<PiggyBundle>` — order matters
+/// only for the pre-level card display.
+///
+/// [type] defaults to normal. Set to a special (bomb/filter/rainbow/…) to
+/// pre-load a special piggy into the puzzle inventory — the spawner will
+/// hand it to the player at its FIFO turn instead of a plain colored piggy.
+/// This is separate from combo-reward specials, which fire opportunistically.
+class PiggyBundle {
+  final PiggyColor color;
+  final int ammo;
+  final int count;
+  final PiggyType type;
+  const PiggyBundle({
+    required this.color,
+    this.ammo = 1,
+    this.count = 1,
+    this.type = PiggyType.normal,
+  });
+
+  int get shotPotential => ammo * count;
+}
+
 class LevelConfig {
   final int levelNumber;
   final List<List<BlockSpec?>> grid;
+
+  // ── Puzzle-mode fields (2026-08-11 redesign) ─────────────────────────────
+  // When [inventory] is non-null the level runs in puzzle mode: the arsenal
+  // is pre-loaded into the queue/waiting slots and the RNG spawner is off.
+  // When null the level falls back to the legacy weighted spawner (Endless
+  // pre-migration + any level we haven't converted yet).
+
+  final List<PiggyBundle>? inventory;
+
+  /// Par — designer's target for launches. Perfect = launches ≤ par + perfectLaunchTolerance.
+  final int? targetLaunches;
+
+  /// ΣHP of all destructible blocks. Used as the denominator for the unused-
+  /// ammo deviation. Auto-derived from [grid] when null.
+  final int? targetHits;
+
+  final int expectedCombos;
+
+  /// launches ≤ par + softLaunchTolerance → insidePar checklist tick.
+  final int softLaunchTolerance;
+
+  /// launches > par + failLaunchOverflow → rank D. Set very high (e.g. 999)
+  /// for tutorial levels where we don't want a hard fail.
+  final int failLaunchOverflow;
+
+  /// launches ≤ par + perfectLaunchTolerance → Perfect eligible.
+  final int perfectLaunchTolerance;
+
+  /// Puzzle-mode "third star". Null → no mastery challenge on this level.
+  /// The scorer evaluates it against actual play stats and reports pass/fail
+  /// in [LevelResult.masteryPassed] (nullable string label goes alongside).
+  final MasteryChallenge? masteryChallenge;
+
+  // ── Legacy fields (weighted spawner) ─────────────────────────────────────
   final List<PiggyColor> spawnPalette;
   final int ammoMin;
   final int ammoMax;
@@ -137,6 +233,14 @@ class LevelConfig {
     required this.levelNumber,
     required this.grid,
     required this.spawnPalette,
+    this.inventory,
+    this.targetLaunches,
+    this.targetHits,
+    this.expectedCombos = 0,
+    this.softLaunchTolerance = 2,
+    this.failLaunchOverflow = 999,
+    this.perfectLaunchTolerance = 0,
+    this.masteryChallenge,
     this.ammoMin = 5,
     this.ammoMax = 25,
     this.spawnInterval = 0.9,
@@ -146,6 +250,57 @@ class LevelConfig {
     this.maxConveyorCapacity = 1,
     this.comboRewards = const [],
   });
+
+  /// True when the level runs in puzzle mode (pre-loaded arsenal, no RNG
+  /// spawner). Everything downstream keys off this.
+  bool get isPuzzleMode => inventory != null;
+
+  /// Sum of every piggy in the arsenal. Used for pre-level HUD, sizing the
+  /// queue/waiting layout, and cost accounting.
+  int get arsenalCount => inventory?.fold(0, (a, b) => a! + b.count) ?? 0;
+
+  /// Sum of ammo across every piggy in the arsenal. Upper bound on total
+  /// shots the player can fire this level.
+  int get arsenalShotPotential =>
+      inventory?.fold(0, (a, b) => a! + b.shotPotential) ?? 0;
+
+  /// Unique colors present in the arsenal. NOT used as `allowedColors` in the
+  /// scoring pipeline — that's [boardColors]. Kept for tooling / debug.
+  Set<PiggyColor> get inventoryColors =>
+      inventory?.map((b) => b.color).toSet() ?? const {};
+
+  /// Colors present on the DESTRUCTIBLE board (excludes stone/portal).
+  /// Includes dual-block innerColor. This is the puzzle's "required palette":
+  ///  • extra colors used  = colorsUsed − boardColors  (dead-color piggies)
+  ///  • missing colors     = boardColors − colorsUsed  (color left un-shot)
+  /// A dead-color trap piggy is inventory ∖ boardColors: skipping it is
+  /// CORRECT (no missing penalty); launching it triggers extraColors penalty.
+  Set<PiggyColor> get boardColors {
+    final s = <PiggyColor>{};
+    for (final row in grid) {
+      for (final cell in row) {
+        if (cell == null || cell.isStone || cell.isPortal) continue;
+        if (cell.color != null) s.add(cell.color!);
+        if (cell.innerColor != null) s.add(cell.innerColor!);
+        if (cell.colorShiftStates != null) s.addAll(cell.colorShiftStates!);
+      }
+    }
+    return s;
+  }
+
+  /// ΣHP of all destructible blocks (stone/portal excluded). Falls back to
+  /// grid inspection when [targetHits] is null — puzzle levels can just set
+  /// grid + par and get targetHits for free.
+  int get effectiveTargetHits {
+    if (targetHits != null) return targetHits!;
+    var sum = 0;
+    for (final row in grid) {
+      for (final c in row) {
+        if (c != null && !c.isStone && !c.isPortal) sum += c.hp;
+      }
+    }
+    return sum;
+  }
 
   /// Preferred constructor for new levels: pulls speed/ammo/interval/rewards
   /// from [LevelDifficulty] using the level's position inside its world.

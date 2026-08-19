@@ -24,6 +24,18 @@ class Progress {
     }
   }
 
+  /// Dev-cheat: bump [_keyMaxCompleted] so every level in [levels] is
+  /// unlocked. Called from the 6-tap PiFlow-title easter egg on HomeScreen.
+  /// Doesn't touch per-level stars/scores — the player still has to actually
+  /// play each level to earn them.
+  static Future<void> unlockAllLevels(int upToLevelNumber) async {
+    final prefs = await SharedPreferences.getInstance();
+    final current = prefs.getInt(_keyMaxCompleted) ?? 0;
+    if (upToLevelNumber > current) {
+      await prefs.setInt(_keyMaxCompleted, upToLevelNumber);
+    }
+  }
+
   /// Best stars stored for [levelNumber], 0..3. 0 = not completed.
   static Future<int> loadStars(int levelNumber) async {
     final prefs = await SharedPreferences.getInstance();
