@@ -77,7 +77,7 @@ const List<WorldConfig> worlds = [
     emoji: '🧪',
     color: Color(0xFFFF3B93),
     firstLevel: 21,
-    lastLevel: 25,
+    lastLevel: 30,
     tagline: 'Спец-пиги: бомбы и реакции',
   ),
 ];
@@ -1760,5 +1760,99 @@ final List<LevelConfig> levels = [
     ],
     piggySpeed: 520,
     spawnInterval: 0.77,
+  ),
+
+  // L26 — 🧪 «Полигон» (тестовый уровень, спроектирован в Grid Lab Aleksey'ем).
+  //   Все механики Neon Lab в одной сетке: armor (G2/Y2/V2/P2), 5 типов dual
+  //   (_cp / _yg / _ov / _pc / _vo), chamber из 16 stones, 2 filter piggies.
+  //   Одинокий _PA заменён на _e (portal без пары = мертвая клетка,
+  //   raycast трактует как stone). Portals в следующих итерациях.
+  //
+  //   Grid 10×10 · destructible: 82 (+ 16 stones)
+  //   Shots per color (посчитаны из редактора + verified вручную):
+  //     C = 6 clean + 4 (_cp outer) + 4 (_pc inner) = 14
+  //     P = 2 clean + 16 (_p2 armor) + 4 (_cp inner) + 4 (_pc outer) = 26
+  //     Y = 48 (_y2 armor) + 2 (_yg outer) = 50
+  //     G = 20 (_g2 armor) + 2 (_yg inner) = 22
+  //     V = 16 (_v2 armor) + 10 (_ov inner) + 5 (_vo outer) = 31
+  //     O = 10 (_ov outer) + 5 (_vo inner) = 15
+  //   Total normal = 158 + filter 16.
+  //
+  //   Order-critical duals:
+  //     _cp: C→P    (C-piggy до P)
+  //     _pc: P→C    (P до C — конфликт с _cp! Play accepts flexibility)
+  //     _yg: Y→G
+  //     _ov: O→V    (O piggy до V)
+  //     _vo: V→O    (V до O)
+  //   Player использует piggies-in-waiting для отложенной стрельбы —
+  //   inner-color piggies дожидаются пока outer убит.
+  //
+  //   Inventory (23 pigs, 2 specials, no traps — тест):
+  //     C × 3: 8+4+2   = 14
+  //     P × 4: 12+8+4+2 = 26
+  //     Y × 5: 20+15+10+3+2 = 50
+  //     G × 3: 12+7+3  = 22
+  //     O × 2: 10+5    = 15
+  //     V × 4: 15+10+4+2 = 31
+  //     FILTER × 2 ammo=8+8 (⚡ 16 stones chamber)
+  //
+  //   Par: 23. Boss-scale (>150 shots) — тест на выносливость и планирование.
+  LevelConfig(
+    levelNumber: 26,
+    grid: [
+      [_g2, _g2, _c , _c , _c , _c , _c , _c , _g2, _g2],
+      [_g2, _y2, _y2, _cp, _cp, _cp, _cp, _y2, _y2, _g2],
+      [_g2, _y2, _S , _S , _S , _S , _S , _S , _y2, _g2],
+      [_g2, _y2, _S , _yg, _S , _S , _yg, _S , _y2, _g2],
+      [_ov, _y2, _S , _S , _S , _S , _S , _S , _y2, _ov],
+      [_ov, _ov, _ov, _ov, _pc, _pc, _ov, _ov, _ov, _ov],
+      [_v2, _y2, _y2, _p , _vo, _vo, _p , _y2, _y2, _v2],
+      [_v2, _y2, _pc, _y2, _vo, _vo, _y2, _pc, _y2, _v2],
+      [_v2, _y2, _y2, _y2, _vo, _e , _y2, _y2, _y2, _v2], // _PA→_e (portal без пары)
+      [_v2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _v2],
+    ],
+    inventory: const [
+      // C first — _cp outer + clean C
+      PiggyBundle(color: PiggyColor.cyan,   ammo:  8),
+      PiggyBundle(color: PiggyColor.cyan,   ammo:  4),
+      PiggyBundle(color: PiggyColor.cyan,   ammo:  2), // sum C = 14
+      // P — _p2 armor + _pc outer + _cp inner + clean
+      PiggyBundle(color: PiggyColor.pink,   ammo: 12),
+      PiggyBundle(color: PiggyColor.pink,   ammo:  8),
+      PiggyBundle(color: PiggyColor.pink,   ammo:  4),
+      PiggyBundle(color: PiggyColor.pink,   ammo:  2), // sum P = 26
+      // Y — _y2 armor + _yg outer (много Y — bulk)
+      PiggyBundle(color: PiggyColor.yellow, ammo: 20),
+      PiggyBundle(color: PiggyColor.yellow, ammo: 15),
+      PiggyBundle(color: PiggyColor.yellow, ammo: 10),
+      PiggyBundle(color: PiggyColor.yellow, ammo:  3),
+      PiggyBundle(color: PiggyColor.yellow, ammo:  2), // sum Y = 50
+      // G — _g2 armor + _yg inner
+      PiggyBundle(color: PiggyColor.green,  ammo: 12),
+      PiggyBundle(color: PiggyColor.green,  ammo:  7),
+      PiggyBundle(color: PiggyColor.green,  ammo:  3), // sum G = 22
+      // O — _ov outer + _vo inner (O до V)
+      PiggyBundle(color: PiggyColor.orange, ammo: 10),
+      PiggyBundle(color: PiggyColor.orange, ammo:  5), // sum O = 15
+      // V — _v2 armor + _ov inner + _vo outer (V перекликается с O через оба dual)
+      PiggyBundle(color: PiggyColor.purple, ammo: 15),
+      PiggyBundle(color: PiggyColor.purple, ammo: 10),
+      PiggyBundle(color: PiggyColor.purple, ammo:  4),
+      PiggyBundle(color: PiggyColor.purple, ammo:  2), // sum V = 31
+      // FILTER × 2 — 16 stones chamber
+      PiggyBundle(color: PiggyColor.cyan,   ammo:  8, type: PiggyType.filter),
+      PiggyBundle(color: PiggyColor.cyan,   ammo:  8, type: PiggyType.filter),
+    ],
+    targetLaunches: 23,
+    perfectLaunchTolerance: 0,
+    softLaunchTolerance: 2,
+    expectedCombos: 1,
+    masteryChallenge: MasteryChallenge.noWastedShots,
+    spawnPalette: const [
+      PiggyColor.cyan, PiggyColor.pink, PiggyColor.yellow,
+      PiggyColor.green, PiggyColor.orange, PiggyColor.purple,
+    ],
+    piggySpeed: 520,
+    spawnInterval: 0.75,
   ),
 ];
