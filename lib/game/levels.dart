@@ -1855,4 +1855,93 @@ final List<LevelConfig> levels = [
     piggySpeed: 520,
     spawnInterval: 0.75,
   ),
+
+  // L27 — 🌀 «Троепортал» (тестовый уровень из Grid Lab, три портал-пары).
+  //   Внешнее кольцо из 12 stones (столбцы 0 и 9 rows 2-7) блокирует shot
+  //   line с left/right belt — вся сложность внутренняя достигается через
+  //   top/bottom belt И через 3 портала:
+  //     _PA (3,7) ↔ (6,2)
+  //     _PB (2,2) ↔ (7,7)
+  //     _PC (1,9) ↔ (8,0)
+  //   Плюс shift YOP × 2 в углах верхней и нижней строки — order-critical.
+  //
+  //   Grid 10×10. Destructible: 62. Shots per color (пересчёт вручную):
+  //     C = 3 clean (_c) + 8 (_cp outer) = 11
+  //     P = 3 clean (_p) + 16 (_p2 armor) + 8 (_cp inner) + 2 (shift state 2) = 29
+  //     Y = 16 (_y2 armor) + 10 (_yg outer) + 2 (shift state 0) = 28
+  //     G = 24 (_g2 armor) + 10 (_yg inner) = 34
+  //     V = 16 (_v2 armor) = 16
+  //     O = 2 (shift state 1) = 2
+  //   Total normal = 120 + filter 12 chamber-stones.
+  //
+  //   Inventory (21 pigs, 2 specials, без trap — тест):
+  //     C × 3: 6+3+2 = 11
+  //     P × 4: 12+8+5+4 = 29
+  //     Y × 4: 12+8+5+3 = 28
+  //     G × 4: 15+10+6+3 = 34
+  //     V × 3: 8+5+3 = 16
+  //     O × 1 ammo=2
+  //     FILTER × 2 ammo=6+6 = 12 (⚡ 12 stones внешнего кольца)
+  //
+  //   Order: shift YOP требует Y→O→P. FIFO: C→Y→O→P→G→V→FILTER.
+  //   Piggies с inner-color (P для _cp, G для _yg) ждут в waiting-slots
+  //   пока outer убит. Portal shots — player экспериментирует.
+  //
+  //   Par: 21 launches.
+  LevelConfig(
+    levelNumber: 27,
+    grid: [
+      [_e       , _e , _e , _e , _e , _e , _e , _e , _e , _e       ],
+      [_shiftYOP, _v2, _v2, _v2, _yg, _yg, _yg, _yg, _yg, _PC      ],
+      [_S       , _v2, _PB, _p2, _p2, _p2, _p2, _g2, _g2, _S       ],
+      [_S       , _cp, _cp, _y2, _y2, _y2, _y2, _PA, _g2, _S       ],
+      [_S       , _cp, _cp, _c , _c , _c , _g2, _g2, _g2, _S       ],
+      [_S       , _g2, _g2, _g2, _p , _p , _p , _cp, _cp, _S       ],
+      [_S       , _g2, _PA, _y2, _y2, _y2, _y2, _cp, _cp, _S       ],
+      [_S       , _g2, _g2, _p2, _p2, _p2, _p2, _PB, _v2, _S       ],
+      [_PC      , _yg, _yg, _yg, _yg, _yg, _v2, _v2, _v2, _shiftYOP],
+      [_e       , _e , _e , _e , _e , _e , _e , _e , _e , _e       ],
+    ],
+    inventory: const [
+      // C — clean + _cp outer (early чтобы открыть _cp inner для P)
+      PiggyBundle(color: PiggyColor.cyan,   ammo:  6),
+      PiggyBundle(color: PiggyColor.cyan,   ammo:  3),
+      PiggyBundle(color: PiggyColor.cyan,   ammo:  2), // sum C = 11
+      // Y — _y2 armor + _yg outer + shift state 0 (Y идёт до O)
+      PiggyBundle(color: PiggyColor.yellow, ammo: 12),
+      PiggyBundle(color: PiggyColor.yellow, ammo:  8),
+      PiggyBundle(color: PiggyColor.yellow, ammo:  5),
+      PiggyBundle(color: PiggyColor.yellow, ammo:  3), // sum Y = 28
+      // O — shift state 1 (O до P)
+      PiggyBundle(color: PiggyColor.orange, ammo:  2), // sum O = 2
+      // P — clean + _p2 armor + _cp inner + shift state 2
+      PiggyBundle(color: PiggyColor.pink,   ammo: 12),
+      PiggyBundle(color: PiggyColor.pink,   ammo:  8),
+      PiggyBundle(color: PiggyColor.pink,   ammo:  5),
+      PiggyBundle(color: PiggyColor.pink,   ammo:  4), // sum P = 29
+      // G — _g2 armor + _yg inner (после Y kill outer)
+      PiggyBundle(color: PiggyColor.green,  ammo: 15),
+      PiggyBundle(color: PiggyColor.green,  ammo: 10),
+      PiggyBundle(color: PiggyColor.green,  ammo:  6),
+      PiggyBundle(color: PiggyColor.green,  ammo:  3), // sum G = 34
+      // V — _v2 armor
+      PiggyBundle(color: PiggyColor.purple, ammo:  8),
+      PiggyBundle(color: PiggyColor.purple, ammo:  5),
+      PiggyBundle(color: PiggyColor.purple, ammo:  3), // sum V = 16
+      // FILTER × 2 — 12 stones outer chamber
+      PiggyBundle(color: PiggyColor.cyan,   ammo:  6, type: PiggyType.filter),
+      PiggyBundle(color: PiggyColor.cyan,   ammo:  6, type: PiggyType.filter),
+    ],
+    targetLaunches: 21,
+    perfectLaunchTolerance: 0,
+    softLaunchTolerance: 2,
+    expectedCombos: 1,
+    masteryChallenge: MasteryChallenge.noWastedShots,
+    spawnPalette: const [
+      PiggyColor.cyan, PiggyColor.pink, PiggyColor.yellow,
+      PiggyColor.green, PiggyColor.orange, PiggyColor.purple,
+    ],
+    piggySpeed: 530,
+    spawnInterval: 0.73,
+  ),
 ];
