@@ -398,7 +398,7 @@ class PixelFlowGame extends FlameGame with HasCollisionDetection {
         comboFlashSize: comboSize,
         comboFlashAt: _gameTime,
       );
-      _maybeAwardSpecialPiggy();
+      _maybeAwardSpecialPiggy(comboSize);
       // Achievement hooks — fire-and-forget, don't block combo flow.
       AchievementManager.unlock(Achievement.firstCombo);
       if (comboSize >= 8) AchievementManager.unlock(Achievement.bigCombo);
@@ -408,18 +408,38 @@ class PixelFlowGame extends FlameGame with HasCollisionDetection {
 
   /// Combo of 5+ blocks pops in a short window → queue up a special piggy.
   /// Multiple guards keep specials from becoming free wins:
-  ///  - level must actually offer rewards
+  ///  - reward pool must exist (level's comboRewards, ИЛИ post-L15 fallback
+  ///    из всего каталога с probability-roll по размеру комбо)
   ///  - no other reward pending or already sitting unspent in queue/waiting
   ///  - cooldown of [_rewardCooldown] seconds since the last granted reward
-  void _maybeAwardSpecialPiggy() {
+  void _maybeAwardSpecialPiggy(int comboSize) {
     if (pendingRewardType != null) return;
-    final rewards = level.comboRewards;
-    if (rewards.isEmpty) return;
     if (_gameTime - _lastRewardAt < _rewardCooldown) return;
     if (_hasUnspentSpecial()) return;
-    pendingRewardType = rewards[_rewardRng.nextInt(rewards.length)];
+
+    List<PiggyType> pool = level.comboRewards;
+    // После L15: если уровень не задал comboRewards — берём рандомную
+    // super-piggy из полного каталога, но не гарантированно: probability
+    // растёт с размером комбо (5→30%, 7→40%, 10→55%, 12+→60%).
+    if (pool.isEmpty && level.levelNumber > 15) {
+      final chance = _randomRewardChance(comboSize);
+      if (_rewardRng.nextDouble() >= chance) return;
+      pool = PiggyType.values
+          .where((t) => t.isSpecial && t != PiggyType.breaker)
+          .toList();
+    }
+    if (pool.isEmpty) return;
+
+    pendingRewardType = pool[_rewardRng.nextInt(pool.length)];
     _lastRewardAt = _gameTime;
     fx.value = fx.value.copy(pendingReward: pendingRewardType);
+  }
+
+  /// Кривая probability для post-L15 random-drop.
+  /// combo=5→0.30, combo=7→0.40, combo=10→0.55, combo≥12→0.60.
+  double _randomRewardChance(int comboSize) {
+    if (comboSize < 5) return 0.0;
+    return math.min(0.60, 0.30 + (comboSize - 5) * 0.05);
   }
 
   /// True if there's already a special piggy sitting in queue or waiting-slots
