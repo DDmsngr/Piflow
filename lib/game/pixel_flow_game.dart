@@ -1172,6 +1172,22 @@ class BlockComponent extends PositionComponent {
     );
   }
 
+  // Кэши render-объектов. Спрайты стабильного размера — создаём один раз,
+  // переиспользуем каждый кадр. Без этого portal.render() + stone.render()
+  // на 25×25 grid'ах съедали ~2ms/frame budget (TextPainter.layout самое
+  // дорогое) — фиксили лаг на Xiaomi 14T Pro 2026-08-25.
+  RRect? _cachedFullRRect;
+  RRect? _cachedInnerRRect;
+  Paint? _cachedStoneBase;
+  Paint? _cachedStoneStroke;
+  Paint? _cachedStoneGlare;
+  Paint? _cachedStoneCross;
+  RRect? _cachedStoneGlareRRect;
+  Paint? _cachedPortalOuter;
+  Paint? _cachedPortalInner;
+  TextPainter? _cachedPortalLabel;
+  Offset? _cachedPortalLabelOffset;
+
   @override
   void render(Canvas canvas) {
     if (spec.isStone) {
@@ -1197,81 +1213,80 @@ class BlockComponent extends PositionComponent {
   ];
 
   void _renderPortal(Canvas canvas) {
-    final id = spec.portalPairId.clamp(0, _portalPalettes.length - 1);
-    final palette = _portalPalettes[id];
-    final rect = Rect.fromLTWH(0, 0, size.x, size.y);
-    final rrect = RRect.fromRectAndRadius(rect, Radius.circular(size.x * 0.5));
-    // Outer ring — dark base with pair-colour halo.
-    canvas.drawRRect(
-      rrect,
-      Paint()..color = Colors.black.withValues(alpha: 0.55),
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
+    // Инит кэша при первом render (size уже стабилен из BoardComponent.onLoad).
+    if (_cachedPortalOuter == null) {
+      final id = spec.portalPairId.clamp(0, _portalPalettes.length - 1);
+      final palette = _portalPalettes[id];
+      final rect = Rect.fromLTWH(0, 0, size.x, size.y);
+      _cachedFullRRect = RRect.fromRectAndRadius(rect, Radius.circular(size.x * 0.5));
+      _cachedInnerRRect = RRect.fromRectAndRadius(
         Rect.fromLTWH(size.x * 0.08, size.y * 0.08, size.x * 0.84, size.y * 0.84),
         Radius.circular(size.x * 0.5),
-      ),
-      Paint()
+      );
+      _cachedPortalOuter = Paint()..color = Colors.black.withValues(alpha: 0.55);
+      _cachedPortalInner = Paint()
         ..shader = RadialGradient(
           colors: palette,
           stops: const [0.0, 0.55, 1.0],
-        ).createShader(Rect.fromLTWH(size.x * 0.15, size.y * 0.15, size.x * 0.7, size.y * 0.7)),
-    );
-    // Pair label — small tag so the player pairs A and B at a glance.
-    final label = String.fromCharCode(0x41 + id); // 'A', 'B', 'C', ...
-    final tp = TextPainter(
-      text: TextSpan(
-        text: label,
-        style: TextStyle(
-          fontSize: size.x * 0.4,
-          color: Colors.black.withValues(alpha: 0.75),
-          fontWeight: FontWeight.w900,
+        ).createShader(Rect.fromLTWH(size.x * 0.15, size.y * 0.15, size.x * 0.7, size.y * 0.7));
+      final label = String.fromCharCode(0x41 + id); // 'A', 'B', 'C', ...
+      _cachedPortalLabel = TextPainter(
+        text: TextSpan(
+          text: label,
+          style: TextStyle(
+            fontSize: size.x * 0.4,
+            color: Colors.black.withValues(alpha: 0.75),
+            fontWeight: FontWeight.w900,
+          ),
         ),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    tp.paint(canvas, Offset((size.x - tp.width) / 2, (size.y - tp.height) / 2));
+        textDirection: TextDirection.ltr,
+      )..layout();
+      _cachedPortalLabelOffset = Offset(
+        (size.x - _cachedPortalLabel!.width) / 2,
+        (size.y - _cachedPortalLabel!.height) / 2,
+      );
+    }
+    canvas.drawRRect(_cachedFullRRect!, _cachedPortalOuter!);
+    canvas.drawRRect(_cachedInnerRRect!, _cachedPortalInner!);
+    _cachedPortalLabel!.paint(canvas, _cachedPortalLabelOffset!);
   }
 
   void _renderStone(Canvas canvas) {
-    final rect = Rect.fromLTWH(0, 0, size.x, size.y);
-    final rrect = RRect.fromRectAndRadius(rect, Radius.circular(size.x * 0.15));
-    final base = Paint()
-      ..shader = const LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [Color(0xFF9AA1B0), Color(0xFF5D6270)],
-      ).createShader(rect);
-    canvas.drawRRect(rrect, base);
-    canvas.drawRRect(
-      rrect,
-      Paint()
+    if (_cachedStoneBase == null) {
+      final rect = Rect.fromLTWH(0, 0, size.x, size.y);
+      _cachedFullRRect = RRect.fromRectAndRadius(rect, Radius.circular(size.x * 0.15));
+      _cachedStoneBase = Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF9AA1B0), Color(0xFF5D6270)],
+        ).createShader(rect);
+      _cachedStoneStroke = Paint()
         ..color = Colors.black.withValues(alpha: 0.4)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = size.x * 0.06,
-    );
-    // Highlight glare
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
+        ..strokeWidth = size.x * 0.06;
+      _cachedStoneGlare = Paint()..color = Colors.white.withValues(alpha: 0.18);
+      _cachedStoneGlareRRect = RRect.fromRectAndRadius(
         Rect.fromLTWH(size.x * 0.12, size.x * 0.12, size.x * 0.35, size.x * 0.22),
         Radius.circular(size.x * 0.08),
-      ),
-      Paint()..color = Colors.white.withValues(alpha: 0.18),
-    );
-    // Etched cross to signal "unbreakable"
-    final xPaint = Paint()
-      ..color = Colors.black.withValues(alpha: 0.35)
-      ..strokeWidth = size.x * 0.08
-      ..style = PaintingStyle.stroke;
+      );
+      _cachedStoneCross = Paint()
+        ..color = Colors.black.withValues(alpha: 0.35)
+        ..strokeWidth = size.x * 0.08
+        ..style = PaintingStyle.stroke;
+    }
+    canvas.drawRRect(_cachedFullRRect!, _cachedStoneBase!);
+    canvas.drawRRect(_cachedFullRRect!, _cachedStoneStroke!);
+    canvas.drawRRect(_cachedStoneGlareRRect!, _cachedStoneGlare!);
     canvas.drawLine(
       Offset(size.x * 0.28, size.y * 0.28),
       Offset(size.x * 0.72, size.y * 0.72),
-      xPaint,
+      _cachedStoneCross!,
     );
     canvas.drawLine(
       Offset(size.x * 0.72, size.y * 0.28),
       Offset(size.x * 0.28, size.y * 0.72),
-      xPaint,
+      _cachedStoneCross!,
     );
   }
 
