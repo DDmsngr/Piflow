@@ -19,6 +19,15 @@ class AudioService {
 
   static final math.Random _rng = math.Random();
 
+  // Throttling: на Android FlameAudio.play() спавнит AudioPlayer-инстанс
+  // на каждый вызов. При 5 пигах на belt shoot() зовётся ~100 Hz —
+  // audio-тред засоряется, GPU-фрейм проседает, игра лагает целиком.
+  // Даём каждому «горячему» SFX минимальный интервал.
+  static int _lastShootUs = 0;
+  static int _lastPopUs = 0;
+  static const int _shootMinIntervalUs = 60000; // 60 ms → max ~16 Hz
+  static const int _popMinIntervalUs = 40000;   // 40 ms → max ~25 Hz
+
   static const List<String> _pops = [
     'floraphonic-infographic-pop-4-197870.mp3',
     'floraphonic-infographic-pop-5-197872.mp3',
@@ -132,11 +141,19 @@ class AudioService {
   }
 
   static void pop() {
+    final nowUs = DateTime.now().microsecondsSinceEpoch;
+    if (nowUs - _lastPopUs < _popMinIntervalUs) return;
+    _lastPopUs = nowUs;
     final name = _pops[_rng.nextInt(_pops.length)];
     _play(name, volume: 0.7);
   }
 
-  static void shoot() => _play(_shoot, volume: 0.35);
+  static void shoot() {
+    final nowUs = DateTime.now().microsecondsSinceEpoch;
+    if (nowUs - _lastShootUs < _shootMinIntervalUs) return;
+    _lastShootUs = nowUs;
+    _play(_shoot, volume: 0.35);
+  }
   static void click() => _play(_click, volume: 0.5);
   static void launch() => _play(_launch, volume: 0.6);
   static void win() => _play(_win, volume: 0.9);
