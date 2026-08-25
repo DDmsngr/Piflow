@@ -247,7 +247,10 @@ class LevelConfig {
     this.queueSlots = 3,
     this.waitingSlots = 5,
     this.piggySpeed = 195,
-    this.maxConveyorCapacity = 1,
+    // Aleksey 2026-08-21: до 5 piggies одновременно на belt. Если piggy
+    // доехала до конца loop, а все waitingSlots заняты — проигрыш
+    // (см. `_goToSlot` в pixel_flow_game.dart).
+    this.maxConveyorCapacity = 5,
     this.comboRewards = const [],
   });
 

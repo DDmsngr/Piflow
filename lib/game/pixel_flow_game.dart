@@ -10,9 +10,9 @@ import 'package:flutter/services.dart';
 
 import 'achievements.dart';
 import 'audio.dart';
+import 'buffs.dart';
 import 'models.dart';
 import 'scoring.dart';
-import 'skins.dart';
 
 /// Snapshot of transient in-game FX for the HUD overlay to render.
 /// Rebuilt only when something actually changes (not per-frame) so
@@ -206,12 +206,7 @@ class PixelFlowGame extends FlameGame with HasCollisionDetection {
   @override
   Color backgroundColor() => const Color(0xFF2A2140);
 
-  /// Cached active skin. Loaded once at game start; changing skin in the shop
-  /// takes effect on the next played level (no live-swap mid-game).
-  SkinId activeSkin = SkinId.none;
-
   Future<void> _preloadImages() async {
-    activeSkin = await SkinManager.loadActive();
     final names = <String>[
       'bg_game.png',
       'board_frame.png',
@@ -221,10 +216,6 @@ class PixelFlowGame extends FlameGame with HasCollisionDetection {
       for (final c in PiggyColor.values) 'ball_${c.name}.png',
       for (final t in PiggyType.values)
         if (t.spriteAsset != null) t.spriteAsset!,
-      // Only preload skin art if it actually exists on disk — hasArt gate
-      // avoids crashes while placeholders (hasArt=false) are in play.
-      if (activeSkin != SkinId.none && activeSkin.hasArt)
-        'skin_${activeSkin.id}.png',
     ];
     for (final n in names) {
       _sprites[n] = await Sprite.load(n);
@@ -289,6 +280,8 @@ class PixelFlowGame extends FlameGame with HasCollisionDetection {
 
     // Queue at bottom — puzzle mode pulls from the pre-loaded arsenal FIFO;
     // legacy mode still uses the weighted RNG spawner.
+    // Супер-пиги из магазина НЕ приходят автоматически — теперь их запускает
+    // player тапом по HUD-иконке (см. `launchBuffPiggy` ниже).
     final queueRect = Rect.fromLTWH(20, worldHeight - 170, worldWidth - 40, 70);
     piggyQueue = QueueComponent(
       area: queueRect,
@@ -303,8 +296,52 @@ class PixelFlowGame extends FlameGame with HasCollisionDetection {
     world.add(piggyQueue);
   }
 
+  /// Запуск супер-пиги по tap на HUD-иконку. Piggy спавнится сразу на belt
+  /// (не проходит через queue) — минуя FIFO. Возвращает false если belt
+  /// переполнен (maxConveyorCapacity) — тогда player должен подождать.
+  /// Player-side (game_screen) списывает заряд из BuffManager только если
+  /// возвращено true.
+  bool launchBuffPiggy(PiggyType type) {
+    if (_finished) return false;
+    if (conveyorLoad >= level.maxConveyorCapacity) return false;
+    final buff = BuffManager.buffFor(type);
+    if (buff == null) return false;
+
+    // Расположение как в tryLaunchPiggy — spaced по periметру.
+    final riding = _piggiesOnBelt.toList();
+    double startDistance = 0;
+    if (riding.isNotEmpty) {
+      final farthest = riding
+          .map((p) => p.trackDistance)
+          .reduce((a, b) => a > b ? a : b);
+      startDistance = farthest - conveyor.perimeter / level.maxConveyorCapacity;
+      if (startDistance < 0) startDistance += conveyor.perimeter;
+    }
+
+    final piggy = PiggyComponent(
+      piggyColor: buff.tintColor,
+      ammo: buff.ammo,
+      position: conveyor.positionAt(startDistance).clone(),
+      type: type,
+    );
+    world.add(piggy);
+    piggy.startOnConveyor(conveyor, startDistance: startDistance);
+    recordLaunch(piggy);
+    AudioService.launch();
+    return true;
+  }
+
   bool _finished = false;
   double _loseCheckTimer = 0;
+
+  /// Set by [PiggyComponent._goToSlot] when a piggy completes a belt-loop
+  /// and every waiting-slot is occupied. Next `update()` tick converts it
+  /// to a proper game-over. Only relevant for puzzle-mode play; per Aleksey
+  /// 2026-08-21 this is the moment the level is failed.
+  bool _waitingCrashed = false;
+  void triggerWaitingCrash() {
+    _waitingCrashed = true;
+  }
 
   // Combo bookkeeping: count pops within the last _comboWindow seconds.
   final List<double> _recentPopTimes = [];
@@ -493,6 +530,18 @@ class PixelFlowGame extends FlameGame with HasCollisionDetection {
     }
 
     if (_finished) return;
+
+    // Piggy на belt сделала полный круг и не смогла припарковаться —
+    // waiting-slots full. По правилам Aleksey это моментальный проигрыш.
+    if (_waitingCrashed) {
+      _finished = true;
+      AudioService.lose();
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (!_finished || onLose == null) return;
+        onLose!();
+      });
+      return;
+    }
 
     final n = board.remainingBlocks;
     if (remainingBlocks.value != n) remainingBlocks.value = n;
@@ -1469,18 +1518,6 @@ class PiggyComponent extends PositionComponent with TapCallbacks {
     );
     add(_ammoLabel);
 
-    // Active skin overlay — applies to normal piggies only. Specials keep
-    // their unique art untouched. Skipped when hasArt=false (art pending).
-    final skin = game.activeSkin;
-    if (type == PiggyType.normal && skin != SkinId.none && skin.hasArt) {
-      add(SpriteComponent(
-        sprite: game.sprite('skin_${skin.id}.png'),
-        size: size,
-        anchor: Anchor.center,
-        position: size / 2,
-        priority: 1, // above the body sprites
-      ));
-    }
   }
 
   void _updateAmmoLabel() => _ammoLabel.text = '$ammo';
@@ -1767,6 +1804,10 @@ class PiggyComponent extends PositionComponent with TapCallbacks {
   void _goToSlot() {
     final slot = game.slots.findFreeSlot();
     if (slot == null) {
+      // Aleksey 2026-08-21: piggy сделала полный круг и не смогла припарковаться
+      // (все waiting-slots заняты) — по правилам игры это проигрыш, а не тихий
+      // exit с потерянным ammo.
+      game.triggerWaitingCrash();
       state = PiggyState.leaving;
       return;
     }

@@ -1902,37 +1902,34 @@ final List<LevelConfig> levels = [
       [_PC      , _yg, _yg, _yg, _yg, _yg, _v2, _v2, _v2, _shiftYOP],
       [_e       , _e , _e , _e , _e , _e , _e , _e , _e , _e       ],
     ],
+    // v3 (2026-08-21): revert увеличение слотов (правило Aleksey: 3+5 fixed).
+    // Ammo EXACT (без safety). Разбивка Y/G на early/late — они нужны в
+    // разные моменты игры. Меньше bundles (12 pigs) чтобы не переполнять
+    // waiting → belt-crash game-over (новая механика).
     inventory: const [
-      // C — clean + _cp outer (early чтобы открыть _cp inner для P)
-      PiggyBundle(color: PiggyColor.cyan,   ammo:  6),
-      PiggyBundle(color: PiggyColor.cyan,   ammo:  3),
-      PiggyBundle(color: PiggyColor.cyan,   ammo:  2), // sum C = 11
-      // Y — _y2 armor + _yg outer + shift state 0 (Y идёт до O)
+      // C — clean + _cp outer
+      PiggyBundle(color: PiggyColor.cyan,   ammo:  8),
+      PiggyBundle(color: PiggyColor.cyan,   ammo:  3), // sum C = 11
+      // Y × early — _yg outer × 10 + shift state 0 × 2 = 12 shots
       PiggyBundle(color: PiggyColor.yellow, ammo: 12),
-      PiggyBundle(color: PiggyColor.yellow, ammo:  8),
-      PiggyBundle(color: PiggyColor.yellow, ammo:  5),
-      PiggyBundle(color: PiggyColor.yellow, ammo:  3), // sum Y = 28
-      // O — shift state 1 (O до P)
-      PiggyBundle(color: PiggyColor.orange, ammo:  2), // sum O = 2
-      // P — clean + _p2 armor + _cp inner + shift state 2
-      PiggyBundle(color: PiggyColor.pink,   ammo: 12),
-      PiggyBundle(color: PiggyColor.pink,   ammo:  8),
-      PiggyBundle(color: PiggyColor.pink,   ammo:  5),
-      PiggyBundle(color: PiggyColor.pink,   ammo:  4), // sum P = 29
-      // G — _g2 armor + _yg inner (после Y kill outer)
-      PiggyBundle(color: PiggyColor.green,  ammo: 15),
-      PiggyBundle(color: PiggyColor.green,  ammo: 10),
-      PiggyBundle(color: PiggyColor.green,  ammo:  6),
-      PiggyBundle(color: PiggyColor.green,  ammo:  3), // sum G = 34
-      // V — _v2 armor
-      PiggyBundle(color: PiggyColor.purple, ammo:  8),
-      PiggyBundle(color: PiggyColor.purple, ammo:  5),
-      PiggyBundle(color: PiggyColor.purple, ammo:  3), // sum V = 16
+      // O — shift state 1
+      PiggyBundle(color: PiggyColor.orange, ammo:  2),
+      // P — clean + _p2 armor + _cp inner + shift state 2 = 29
+      PiggyBundle(color: PiggyColor.pink,   ammo: 15),
+      PiggyBundle(color: PiggyColor.pink,   ammo: 14), // sum P = 29
+      // Y × late — _y2 armor (8×2=16) после того как P открыл _p2 линию
+      PiggyBundle(color: PiggyColor.yellow, ammo: 16), // Y sum = 28 exact
+      // G — _g2 armor (12×2=24) + _yg inner (10) = 34
+      PiggyBundle(color: PiggyColor.green,  ammo: 18),
+      PiggyBundle(color: PiggyColor.green,  ammo: 16), // sum G = 34 exact
+      // V — _v2 armor (8 × 2 = 16)
+      PiggyBundle(color: PiggyColor.purple, ammo: 10),
+      PiggyBundle(color: PiggyColor.purple, ammo:  6), // sum V = 16 exact
       // FILTER × 2 — 12 stones outer chamber
       PiggyBundle(color: PiggyColor.cyan,   ammo:  6, type: PiggyType.filter),
       PiggyBundle(color: PiggyColor.cyan,   ammo:  6, type: PiggyType.filter),
     ],
-    targetLaunches: 21,
+    targetLaunches: 13,
     perfectLaunchTolerance: 0,
     softLaunchTolerance: 2,
     expectedCombos: 1,
@@ -1943,5 +1940,310 @@ final List<LevelConfig> levels = [
     ],
     piggySpeed: 530,
     spawnInterval: 0.73,
+  ),
+
+  // L28 — 🌸 «Мандала» (Aleksey Grid Lab, 20×20, ~40 ammo per pig).
+  //
+  //   324 destructible + 8 stones (2 chamber-колонны col 7 и col 12).
+  //   2 portal-пары. Симметрия по обеим осям. Плотный узор из dual-блоков
+  //   (_cp/_pc/_yg/_gy/_ov) + armor (_y2/_g2/_p2). Один из первых уровней
+  //   L82-стиля: piggies с большим ammo, мелкие клетки, много механик разом.
+  //
+  //   Точный подсчёт shots per color:
+  //     C = 18 (_c) + 36 (_cp outer) + 18 (_pc inner) = 72
+  //     P = 36 (_cp inner) + 8 (_p2 armor) + 18 (_pc outer) = 62
+  //     Y = 32 (_y) + 72 (_yg outer) + 72 (_y2 armor 36×2) + 20 (_gy inner) = 196
+  //     G = 72 (_yg inner) + 56 (_g2 armor 28×2) + 20 (_gy outer) = 148
+  //     V = 28 (_ov inner)
+  //     O = 32 (_o) + 28 (_ov outer) = 60
+  //     Filter: 8 stones
+  //   Total normal = 566 + 8 filter.
+  //
+  //   Inventory (12 pigs, exact ammo, interleaved order для order-dependency):
+  //     C × 1 ammo=40 (early — _cp outer + clean C открывают путь для P inner)
+  //     Y × 1 ammo=40 (early — _yg outer + _y clean + _gy inner)
+  //     P × 1 ammo=40 (mid — _p2 armor + _cp inner + _pc outer)
+  //     G × 1 ammo=40 (mid — _g2 partial + _gy outer opens _gy inner)
+  //     O × 1 ammo=40 (mid — _o clean + _ov outer)
+  //     V × 1 ammo=28 (mid-late — _ov inner после O killed outer, exact)
+  //     Y × 4 ammo=40+40+40+36 = 156 (late — finish Y, sum Y = 196)
+  //     G × 3 ammo=40+40+28 = 108 (late — finish G, sum G = 148)
+  //     C × 1 ammo=32 (late — sum C = 72)
+  //     P × 1 ammo=22 (late — sum P = 62)
+  //     O × 1 ammo=20 (late — sum O = 60)
+  //     FILTER × 1 ammo=8 (⚡ chamber-колонны col 7, col 12)
+  //
+  //   Piggies с большим ammo делают много кругов по belt → супер-пиги
+  //   с HUD в помощь для расчистки path к внутренним слоям.
+  //
+  //   Par: 12 launches (все pigs used).
+  LevelConfig(
+    levelNumber: 28,
+    grid: [
+      [_c , _e , _e , _e , _y , _yg, _o , _o , _o , _o , _o , _o , _o , _o , _yg, _y , _e , _e , _e , _c ],
+      [_cp, _c , _e , _e , _y , _yg, _o , _o , _o , _o , _o , _o , _o , _o , _yg, _y , _e , _e , _c , _cp],
+      [_y2, _cp, _c , _e , _y , _yg, _y , _y , _y , _y , _y , _y , _y , _y , _yg, _y , _e , _c , _cp, _y2],
+      [_ov, _y2, _cp, _c , _y , _yg, _yg, _yg, _yg, _yg, _yg, _yg, _yg, _yg, _yg, _y , _c , _cp, _y2, _ov],
+      [_yg, _ov, _y2, _cp, _c , _g2, _g2, _g2, _g2, _gy, _gy, _g2, _g2, _g2, _g2, _c , _cp, _y2, _ov, _yg],
+      [_yg, _yg, _ov, _y2, _cp, _c , _g2, _g2, _g2, _gy, _gy, _g2, _g2, _g2, _c , _cp, _y2, _ov, _yg, _yg],
+      [_e , _yg, _e , _ov, _PA, _cp, _c , _y2, _y2, _gy, _gy, _y2, _y2, _c , _cp, _e , _ov, _PB, _yg, _e ],
+      [_e , _e , _e , _yg, _e , _e , _cp, _c , _y2, _gy, _gy, _y2, _c , _cp, _e , _e , _yg, _e , _e , _e ],
+      [_e , _e , _e , _yg, _y2, _ov, _cp, _S , _c , _gy, _gy, _c , _S , _cp, _ov, _y2, _yg, _e , _e , _e ],
+      [_yg, _yg, _yg, _yg, _p2, _y2, _ov, _S , _ov, _cp, _cp, _ov, _S , _ov, _y2, _p2, _yg, _yg, _yg, _yg],
+      [_yg, _yg, _yg, _yg, _p2, _y2, _ov, _S , _ov, _cp, _cp, _ov, _S , _ov, _y2, _p2, _yg, _yg, _yg, _yg],
+      [_e , _e , _e , _yg, _y2, _ov, _cp, _S , _pc, _gy, _gy, _pc, _S , _cp, _ov, _y2, _yg, _e , _e , _e ],
+      [_e , _e , _e , _yg, _e , _e , _cp, _pc, _y2, _gy, _gy, _y2, _pc, _cp, _PA, _e , _yg, _e , _e , _e ],
+      [_e , _yg, _PB, _ov, _e , _cp, _pc, _y2, _y2, _gy, _gy, _y2, _y2, _pc, _cp, _e , _ov, _e , _yg, _e ],
+      [_yg, _yg, _ov, _y2, _cp, _pc, _g2, _g2, _g2, _gy, _gy, _g2, _g2, _g2, _pc, _cp, _y2, _ov, _yg, _yg],
+      [_yg, _ov, _y2, _cp, _pc, _g2, _g2, _g2, _g2, _gy, _gy, _g2, _g2, _g2, _g2, _pc, _cp, _y2, _ov, _yg],
+      [_ov, _y2, _cp, _pc, _y , _yg, _yg, _yg, _yg, _yg, _yg, _yg, _yg, _yg, _yg, _y , _pc, _cp, _y2, _ov],
+      [_y2, _cp, _pc, _e , _y , _yg, _y , _y , _y , _y , _y , _y , _y , _y , _yg, _y , _e , _pc, _cp, _y2],
+      [_cp, _pc, _e , _e , _y , _yg, _o , _o , _o , _o , _o , _o , _o , _o , _yg, _y , _e , _e , _pc, _cp],
+      [_pc, _e , _e , _e , _y , _yg, _o , _o , _o , _o , _o , _o , _o , _o , _yg, _y , _e , _e , _e , _pc],
+    ],
+    inventory: const [
+      // Interleaved order: каждый цвет получает ~40-ammo раннего запуска
+      // чтобы прогрызть внешние слои и открыть путь для inner colors.
+      PiggyBundle(color: PiggyColor.cyan,   ammo: 40),
+      PiggyBundle(color: PiggyColor.yellow, ammo: 40),
+      PiggyBundle(color: PiggyColor.pink,   ammo: 40),
+      PiggyBundle(color: PiggyColor.green,  ammo: 40),
+      PiggyBundle(color: PiggyColor.orange, ammo: 40),
+      PiggyBundle(color: PiggyColor.purple, ammo: 28), // V exact (только _ov inner)
+      // Поздние bundles — «доспинывать» большие цвета
+      PiggyBundle(color: PiggyColor.yellow, ammo: 40),
+      PiggyBundle(color: PiggyColor.yellow, ammo: 40),
+      PiggyBundle(color: PiggyColor.yellow, ammo: 40),
+      PiggyBundle(color: PiggyColor.yellow, ammo: 36), // Y sum = 196
+      PiggyBundle(color: PiggyColor.green,  ammo: 40),
+      PiggyBundle(color: PiggyColor.green,  ammo: 40),
+      PiggyBundle(color: PiggyColor.green,  ammo: 28), // G sum = 148
+      PiggyBundle(color: PiggyColor.cyan,   ammo: 32), // C sum = 72
+      PiggyBundle(color: PiggyColor.pink,   ammo: 22), // P sum = 62
+      PiggyBundle(color: PiggyColor.orange, ammo: 20), // O sum = 60
+      // FILTER × 1 — 8 stones (2 chamber-колонны)
+      PiggyBundle(color: PiggyColor.cyan,   ammo:  8, type: PiggyType.filter),
+    ],
+    targetLaunches: 17,
+    perfectLaunchTolerance: 0,
+    softLaunchTolerance: 3,
+    expectedCombos: 2,
+    masteryChallenge: MasteryChallenge.noWastedShots,
+    spawnPalette: const [
+      PiggyColor.cyan, PiggyColor.pink, PiggyColor.yellow,
+      PiggyColor.green, PiggyColor.orange, PiggyColor.purple,
+    ],
+    piggySpeed: 540,
+    spawnInterval: 0.7,
+  ),
+
+  // L29 — 🌀 «Спираль» (Aleksey Grid Lab, 25×25, 24 pigs).
+  //
+  //   620 destructible + 0 stones. 2 portal-пары (B ↔ B, C ↔ C).
+  //   Симметрия по обеим диагоналям — спираль из витков _ov/_c от углов
+  //   к центру. Ядро (rows 10-14, cols 10-15) — плотный _v (purple 1hp)
+  //   внутри _y/_g/_c обмоток для order-dependency: сначала внешние
+  //   витки, потом центр.
+  //
+  //   Точный подсчёт shots per color:
+  //     C = 236 (_c) + 6 (_c2 armor 3×2) = 242
+  //     Y = 45 (_y) + 8 (_y2 armor 4×2) = 53
+  //     G = 43 (_g) + 14 (_g2 armor 7×2) = 57
+  //     P = 271 (_ov inner) + 11 (_v) = 282
+  //     O = 271 (_ov outer) = 271
+  //   Total = 905 shots.
+  //
+  //   Inventory (24 pigs, exact ammo). Порядок: C/O/P интерлив в основе,
+  //   Y/G — точечные finish pigs, всё сходится ровно в сумму per color.
+  //     C ×  6 : 40×5 + 42 = 242
+  //     O ×  7 : 40×6 + 31 = 271
+  //     P ×  7 : 40×6 + 42 = 282
+  //     Y ×  2 : 30 + 23 = 53
+  //     G ×  2 : 30 + 27 = 57
+  //
+  //   Portals:
+  //     _PB : (r=1,c=2) ↔ (r=22,c=21) — сокращают путь из левого верха
+  //           в правый низ по контр-диагонали.
+  //     _PC : (r=3,c=20) ↔ (r=19,c=3) — правый верх ↔ левый низ.
+  //
+  //   Par: 24 launches (все pigs used).
+  LevelConfig(
+    levelNumber: 29,
+    grid: [
+      [_y , _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _y ],
+      [_ov, _y , _PB, _c , _c , _c , _c , _c , _c , _c , _c , _c , _c , _c , _c , _c , _c , _c , _c , _c , _c , _c , _g , _y , _ov],
+      [_ov, _g , _y , _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _y , _g , _ov],
+      [_ov, _c , _ov, _y2, _g , _c , _c , _c , _c , _c , _c , _c , _c , _c , _c , _c , _c , _c , _c , _c , _PC, _y2, _ov, _c , _ov],
+      [_ov, _c , _ov, _g , _y , _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _y , _g , _g , _ov, _c ],
+      [_ov, _c , _ov, _c , _ov, _y , _g , _c , _c , _c , _c , _c , _c , _c , _c , _c , _c , _c , _g , _y , _ov, _c , _g , _ov, _c ],
+      [_ov, _c , _ov, _c , _ov, _g , _y , _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _y , _g , _g , _ov, _c , _ov, _c ],
+      [_ov, _c , _ov, _c , _ov, _c , _ov, _y , _g , _c , _c , _c , _c , _c , _c , _c , _g , _y , _ov, _c , _g , _ov, _c , _ov, _c ],
+      [_ov, _c , _ov, _c , _ov, _c , _ov, _g , _y , _ov, _ov, _ov, _ov, _ov, _ov, _ov, _y , _g , _g , _ov, _c , _ov, _c , _ov, _c ],
+      [_ov, _c , _ov, _c , _ov, _c , _ov, _c , _ov, _y , _g , _c , _c , _c , _g , _y , _ov, _c , _g , _ov, _c , _ov, _c , _ov, _c ],
+      [_ov, _c , _ov, _c , _ov, _c , _ov, _c , _ov, _g , _y , _v , _v , _v , _y , _g , _g , _ov, _c , _ov, _c , _ov, _c , _ov, _c2],
+      [_ov, _c , _ov, _c , _ov, _c , _ov, _c , _ov, _c , _v , _y , _v , _y , _v , _c , _g , _ov, _c , _ov, _c , _ov, _c , _ov, _c2],
+      [_ov, _c , _ov, _c , _ov, _c , _ov, _c , _ov, _c , _v , _v , _y , _c , _v , _e , _c , _ov, _c , _ov, _c , _ov, _c , _ov, _c2],
+      [_ov, _c , _ov, _c , _ov, _c , _ov, _c , _ov, _c , _v , _y , _v , _y , _c , _ov, _c , _ov, _c , _ov, _c , _ov, _c , _ov, _c ],
+      [_ov, _c , _ov, _c , _ov, _c , _ov, _g , _c , _ov, _y , _c , _c , _c , _y , _ov, _c , _ov, _c , _ov, _c , _ov, _c , _ov, _c ],
+      [_ov, _c , _ov, _c , _ov, _c , _ov, _g , _g , _y , _ov, _ov, _ov, _ov, _ov, _y , _g2, _ov, _c , _ov, _c , _ov, _c , _ov, _c ],
+      [_ov, _c , _ov, _c , _ov, _g , _c , _ov, _y , _g , _c , _c , _c , _c , _c , _g2, _y , _ov, _c , _ov, _c , _ov, _c , _ov, _c ],
+      [_ov, _c , _ov, _c , _ov, _g , _g , _y , _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _y , _g2, _ov, _c , _ov, _c , _ov, _c ],
+      [_ov, _c , _ov, _g , _c , _ov, _y , _g , _c , _c , _c , _c , _c , _c , _c , _c , _c , _g2, _y , _ov, _c , _ov, _c , _ov, _c ],
+      [_ov, _c , _ov, _PC, _g , _y , _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _y , _g2, _ov, _c , _ov, _c ],
+      [_ov, _g , _c , _ov, _y , _g , _c , _c , _c , _c , _c , _c , _c , _c , _c , _c , _c , _c , _c , _g2, _y , _ov, _c , _ov, _c ],
+      [_ov, _g , _g , _y2, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _y2, _g2, _ov, _c ],
+      [_g , _ov, _y , _g , _c , _c , _c , _c , _c , _c , _c , _c , _c , _c , _c , _c , _c , _c , _c , _c , _c , _PB, _y , _ov, _c ],
+      [_g , _y , _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _y , _c ],
+      [_y , _c , _c , _c , _c , _c , _c , _c , _c , _c , _c , _c , _c , _c , _c , _c , _c , _c , _c , _c , _c , _c , _c , _c , _y ],
+    ],
+    inventory: const [
+      // C — 6 pigs → sum 242 exact
+      PiggyBundle(color: PiggyColor.cyan,   ammo: 40),
+      PiggyBundle(color: PiggyColor.orange, ammo: 40),
+      PiggyBundle(color: PiggyColor.purple, ammo: 40),
+      PiggyBundle(color: PiggyColor.yellow, ammo: 30),
+      PiggyBundle(color: PiggyColor.cyan,   ammo: 40),
+      PiggyBundle(color: PiggyColor.orange, ammo: 40),
+      PiggyBundle(color: PiggyColor.purple, ammo: 40),
+      PiggyBundle(color: PiggyColor.green,  ammo: 30),
+      PiggyBundle(color: PiggyColor.cyan,   ammo: 40),
+      PiggyBundle(color: PiggyColor.orange, ammo: 40),
+      PiggyBundle(color: PiggyColor.purple, ammo: 40),
+      PiggyBundle(color: PiggyColor.cyan,   ammo: 40),
+      PiggyBundle(color: PiggyColor.orange, ammo: 40),
+      PiggyBundle(color: PiggyColor.purple, ammo: 40),
+      PiggyBundle(color: PiggyColor.cyan,   ammo: 40), // C 5×40=200
+      PiggyBundle(color: PiggyColor.orange, ammo: 40), // O 5×40=200
+      PiggyBundle(color: PiggyColor.purple, ammo: 40), // P 5×40=200
+      PiggyBundle(color: PiggyColor.cyan,   ammo: 42), // C sum = 242 ✓
+      PiggyBundle(color: PiggyColor.yellow, ammo: 23), // Y sum = 53 ✓
+      PiggyBundle(color: PiggyColor.green,  ammo: 27), // G sum = 57 ✓
+      PiggyBundle(color: PiggyColor.orange, ammo: 40),
+      PiggyBundle(color: PiggyColor.purple, ammo: 40),
+      PiggyBundle(color: PiggyColor.orange, ammo: 31), // O sum = 271 ✓
+      PiggyBundle(color: PiggyColor.purple, ammo: 42), // P sum = 282 ✓
+    ],
+    targetLaunches: 24,
+    perfectLaunchTolerance: 0,
+    softLaunchTolerance: 3,
+    expectedCombos: 2,
+    masteryChallenge: MasteryChallenge.noWastedShots,
+    spawnPalette: const [
+      PiggyColor.cyan, PiggyColor.pink, PiggyColor.yellow,
+      PiggyColor.green, PiggyColor.orange, PiggyColor.purple,
+    ],
+    piggySpeed: 480,
+    spawnInterval: 0.7,
+  ),
+
+  // L30 — 🏛 «Крепость» (Aleksey Grid Lab, 25×25, 31 pigs).
+  //
+  //   605 destructible + 16 stones. 2 portal-пары (B/C).
+  //   Многослойная симметрия: верхняя половина — концентрическая крепость
+  //   из _p2 (pink armor) с вставками _g2/_y2/_v2 armor + _o/_v одиночек +
+  //   _pc и мини-камерами. Нижняя — сплошной _gy/_ov/_vo/_pc weave вокруг
+  //   каменной перемычки (16 _S по центру).
+  //
+  //   Точный подсчёт shots per color:
+  //     C = 8 (_c) + 33 (_pc inner) = 41
+  //     P = 132×2 (_p2 armor) + 33 (_pc outer) = 297
+  //     Y = 69 (_y) + 60×2 (_y2 armor) + 2 (_yg outer) + 72 (_gy inner) = 263
+  //     G = 27×2 (_g2 armor) + 2 (_yg inner) + 72 (_gy outer) = 128
+  //     V = 26 (_v) + 46×2 (_v2 armor) + 39 (_ov inner) + 35 (_vo outer) = 192
+  //     O = 56 (_o) + 39 (_ov outer) + 35 (_vo inner) = 130
+  //     Filter: 16 stones (каменная перемычка row 15-16)
+  //   Total normal = 1051 shots.
+  //
+  //   Inventory (31 pigs, exact ammo). Filter в позиции 7 — открывает
+  //   каменный проход к нижней половине. Мелкие «finish»-pigs (G 8, O 10,
+  //   V 32, Y 23, P 17, C 21) стоят в конце — жёсткое no-waste в
+  //   финальной чистке.
+  //     C ×  2 : 20 + 21 = 41
+  //     P ×  8 : 40×7 + 17 = 297
+  //     Y ×  7 : 40×6 + 23 = 263
+  //     G ×  4 : 40×3 + 8 = 128
+  //     V ×  5 : 40×4 + 32 = 192
+  //     O ×  4 : 40×3 + 10 = 130
+  //     FILTER × 1 : 16
+  //
+  //   Portals:
+  //     _PB : (r=1,c=12) ↔ (r=16,c=8) — вертикальный shortcut через
+  //           каменную перемычку.
+  //     _PC : (r=0,c=24) ↔ (r=24,c=0) — по главной диагонали, corner-to-corner.
+  //
+  //   Par: 31 launches (все pigs used).
+  LevelConfig(
+    levelNumber: 30,
+    grid: [
+      [_v , _v , _v , _v , _v , _v , _v , _v , _v , _v , _v , _v , _v , _v , _v , _v , _v , _v , _v , _v , _v , _v , _v , _v , _PC],
+      [_p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _v , _PB, _v , _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2],
+      [_p2, _p2, _p2, _p2, _p2, _p2, _g2, _g2, _p2, _p2, _p2, _y2, _y2, _y2, _p2, _p2, _p2, _g2, _g2, _p2, _p2, _p2, _p2, _p2, _p2],
+      [_p2, _p2, _g2, _g2, _g2, _g2, _g2, _o , _o , _o , _p2, _y2, _y2, _y2, _p2, _o , _o , _o , _g2, _g2, _g2, _g2, _g2, _p2, _p2],
+      [_p2, _p2, _g2, _g2, _g2, _g2, _v2, _v2, _v2, _o , _p2, _y2, _y2, _y2, _p2, _o , _v2, _v2, _v2, _g2, _g2, _g2, _g2, _p2, _p2],
+      [_p2, _g2, _g2, _pc, _y , _y , _y , _pc, _v2, _o , _p2, _y2, _y2, _y2, _p2, _o , _v2, _pc, _y , _y , _y , _pc, _g2, _g2, _p2],
+      [_p2, _o , _v2, _pc, _y , _c , _y , _pc, _v2, _o , _p2, _y2, _y2, _y2, _p2, _o , _v2, _pc, _y , _c , _y , _pc, _v2, _o , _p2],
+      [_p2, _o , _v2, _pc, _y , _c , _y , _pc, _v2, _o , _p2, _y2, _y2, _y2, _p2, _o , _v2, _pc, _y , _c , _y , _pc, _v2, _o , _p2],
+      [_p2, _o , _v2, _p2, _y , _c , _y , _p2, _v2, _o , _p2, _y2, _y2, _y2, _p2, _o , _v2, _p2, _y , _c , _y , _p2, _v2, _o , _p2],
+      [_p2, _o , _v2, _p2, _y , _c , _y , _p2, _v2, _o , _p2, _y2, _y2, _y2, _p2, _o , _v2, _p2, _y , _c , _y , _p2, _v2, _o , _p2],
+      [_p2, _o , _v2, _p2, _y , _y , _y , _p2, _v2, _o , _p2, _y2, _y2, _y2, _p2, _o , _v2, _p2, _y , _y , _y , _p2, _v2, _o , _p2],
+      [_p2, _o , _v2, _p2, _p2, _p2, _p2, _p2, _v2, _o , _p2, _y2, _y2, _y2, _p2, _o , _v2, _p2, _p2, _p2, _p2, _p2, _v2, _o , _p2],
+      [_p2, _o , _v2, _v2, _v2, _v2, _v2, _v2, _v2, _o , _p2, _ov, _vo, _ov, _p2, _o , _v2, _v2, _v2, _v2, _v2, _v2, _v2, _o , _p2],
+      [_p2, _o , _o , _o , _o , _o , _o , _o , _o , _o , _p2, _ov, _vo, _ov, _p2, _o , _o , _o , _o , _o , _o , _o , _o , _o , _p2],
+      [_p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _ov, _vo, _ov, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2],
+      [_y2, _y2, _y2, _y2, _y2, _y2, _y2, _S , _S , _S , _S , _ov, _vo, _ov, _S , _S , _S , _S , _y2, _y2, _y2, _y2, _y2, _y2, _y2],
+      [_y2, _y , _y , _ov, _ov, _ov, _ov, _ov, _PB, _S , _S , _S , _S , _S , _S , _S , _S , _ov, _ov, _ov, _ov, _ov, _y , _y , _y2],
+      [_y2, _y , _ov, _ov, _gy, _gy, _gy, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _gy, _gy, _gy, _ov, _ov, _y , _y2],
+      [_y2, _y , _ov, _gy, _gy, _pc, _gy, _gy, _ov, _ov, _gy, _gy, _gy, _gy, _gy, _ov, _ov, _gy, _gy, _pc, _gy, _gy, _ov, _y , _y2],
+      [_y2, _y , _gy, _gy, _pc, _yg, _pc, _gy, _gy, _gy, _gy, _pc, _gy, _pc, _gy, _gy, _gy, _gy, _pc, _yg, _pc, _gy, _gy, _y , _y2],
+      [_y2, _y , _gy, _pc, _gy, _gy, _gy, _pc, _gy, _gy, _pc, _gy, _pc, _gy, _pc, _gy, _gy, _pc, _gy, _gy, _gy, _pc, _gy, _y , _y2],
+      [_y2, _y , _gy, _pc, _gy, _vo, _gy, _gy, _pc, _pc, _gy, _gy, _vo, _gy, _gy, _pc, _pc, _gy, _gy, _vo, _gy, _pc, _gy, _y , _y2],
+      [_y2, _y , _gy, _gy, _gy, _vo, _vo, _gy, _gy, _gy, _gy, _vo, _vo, _vo, _gy, _gy, _gy, _gy, _vo, _vo, _gy, _gy, _gy, _y , _y2],
+      [_y2, _y , _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _y , _y2],
+      [_PC, _y , _y , _y , _y , _y , _y , _y , _y , _y , _y , _y , _y , _y , _y , _y , _y , _y , _y , _y , _y , _y , _y , _y , _g2],
+    ],
+    inventory: const [
+      PiggyBundle(color: PiggyColor.cyan,   ammo: 20),
+      PiggyBundle(color: PiggyColor.pink,   ammo: 40),
+      PiggyBundle(color: PiggyColor.yellow, ammo: 40),
+      PiggyBundle(color: PiggyColor.green,  ammo: 40),
+      PiggyBundle(color: PiggyColor.purple, ammo: 40),
+      PiggyBundle(color: PiggyColor.orange, ammo: 40),
+      PiggyBundle(color: PiggyColor.cyan,   ammo: 16, type: PiggyType.filter),
+      PiggyBundle(color: PiggyColor.pink,   ammo: 40),
+      PiggyBundle(color: PiggyColor.yellow, ammo: 40),
+      PiggyBundle(color: PiggyColor.green,  ammo: 40),
+      PiggyBundle(color: PiggyColor.purple, ammo: 40),
+      PiggyBundle(color: PiggyColor.orange, ammo: 40),
+      PiggyBundle(color: PiggyColor.pink,   ammo: 40),
+      PiggyBundle(color: PiggyColor.yellow, ammo: 40),
+      PiggyBundle(color: PiggyColor.green,  ammo: 40),
+      PiggyBundle(color: PiggyColor.purple, ammo: 40),
+      PiggyBundle(color: PiggyColor.orange, ammo: 40),
+      PiggyBundle(color: PiggyColor.pink,   ammo: 40),
+      PiggyBundle(color: PiggyColor.yellow, ammo: 40),
+      PiggyBundle(color: PiggyColor.green,  ammo:  8), // G sum = 128 ✓
+      PiggyBundle(color: PiggyColor.purple, ammo: 40),
+      PiggyBundle(color: PiggyColor.orange, ammo: 10), // O sum = 130 ✓
+      PiggyBundle(color: PiggyColor.pink,   ammo: 40),
+      PiggyBundle(color: PiggyColor.yellow, ammo: 40),
+      PiggyBundle(color: PiggyColor.purple, ammo: 32), // V sum = 192 ✓
+      PiggyBundle(color: PiggyColor.pink,   ammo: 40),
+      PiggyBundle(color: PiggyColor.yellow, ammo: 40),
+      PiggyBundle(color: PiggyColor.pink,   ammo: 40),
+      PiggyBundle(color: PiggyColor.yellow, ammo: 23), // Y sum = 263 ✓
+      PiggyBundle(color: PiggyColor.pink,   ammo: 17), // P sum = 297 ✓
+      PiggyBundle(color: PiggyColor.cyan,   ammo: 21), // C sum = 41 ✓
+    ],
+    targetLaunches: 31,
+    perfectLaunchTolerance: 0,
+    softLaunchTolerance: 4,
+    expectedCombos: 3,
+    masteryChallenge: MasteryChallenge.noWastedShots,
+    spawnPalette: const [
+      PiggyColor.cyan, PiggyColor.pink, PiggyColor.yellow,
+      PiggyColor.green, PiggyColor.orange, PiggyColor.purple,
+    ],
+    piggySpeed: 480,
+    spawnInterval: 0.65,
   ),
 ];

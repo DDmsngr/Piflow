@@ -2,6 +2,7 @@ import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 
 import '../game/achievements.dart';
+import '../game/buffs.dart';
 import '../game/levels.dart';
 import '../game/models.dart';
 import '../game/pixel_flow_game.dart';
@@ -223,6 +224,14 @@ class _GameScreenState extends State<GameScreen> {
                   builder: (_, fx, __) => _ComboFlash(size: fx.comboFlashSize),
                 ),
               ),
+            ),
+            // Bottom HUD — панель купленных супер-пигов с зарядами. Tap на
+            // иконку → piggy сразу на belt, счётчик −1.
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 8,
+              child: _SuperPiggyBar(game: game),
             ),
             if (_end == _EndKind.win)
               _lastResult != null
@@ -1104,6 +1113,145 @@ class _VerdictBlock extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Bottom-of-screen bar showing every bought super-piggy with its charge
+/// counter. Tap on an icon → sends that piggy straight to the belt (bypassing
+/// the FIFO queue), counter decrements. Grayed out if the belt is full.
+class _SuperPiggyBar extends StatefulWidget {
+  const _SuperPiggyBar({required this.game});
+  final PixelFlowGame game;
+
+  @override
+  State<_SuperPiggyBar> createState() => _SuperPiggyBarState();
+}
+
+class _SuperPiggyBarState extends State<_SuperPiggyBar> {
+  Map<PiggyType, int> _charges = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _reload();
+  }
+
+  Future<void> _reload() async {
+    final c = await BuffManager.loadCharges();
+    if (!mounted) return;
+    setState(() => _charges = c);
+  }
+
+  Future<void> _use(PiggyBuff buff) async {
+    final launched = widget.game.launchBuffPiggy(buff.type);
+    if (!launched) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Belt заполнен — подожди'),
+          duration: const Duration(milliseconds: 900),
+        ),
+      );
+      return;
+    }
+    await BuffManager.useCharge(buff.type);
+    await _reload();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_charges.isEmpty) return const SizedBox.shrink();
+    final items = allBuffs.where((b) => (_charges[b.type] ?? 0) > 0).toList();
+    if (items.isEmpty) return const SizedBox.shrink();
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.55),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.12),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final buff in items)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 3),
+                child: _SuperPiggyIcon(
+                  buff: buff,
+                  count: _charges[buff.type]!,
+                  onTap: () => _use(buff),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SuperPiggyIcon extends StatelessWidget {
+  const _SuperPiggyIcon({
+    required this.buff,
+    required this.count,
+    required this.onTap,
+  });
+
+  final PiggyBuff buff;
+  final int count;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: SizedBox(
+          width: 54,
+          height: 54,
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: Padding(
+                  padding: const EdgeInsets.all(2),
+                  child: Image.asset(
+                    'assets/images/${buff.spriteAsset}',
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
+              Positioned(
+                right: 0,
+                bottom: 0,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 6, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFF9438),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.black87, width: 1),
+                  ),
+                  child: Text(
+                    '$count',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
