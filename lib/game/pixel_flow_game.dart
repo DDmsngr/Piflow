@@ -741,6 +741,23 @@ class PixelFlowGame extends FlameGame with HasCollisionDetection {
     return true;
   }
 
+  /// Цвета, для которых у игрока СЕЙЧАС есть normal-piggy с ammo>0 —
+  /// на belt, waiting-slot, или ещё в queue-pool. Converter/painter
+  /// красит блоки только в эти цвета, иначе dead-color trap.
+  Set<PiggyColor> get playableNormalColors {
+    final s = <PiggyColor>{};
+    for (final p in world.children.whereType<PiggyComponent>()) {
+      if (p.type.isSpecial) continue;
+      if (p.ammo <= 0) continue;
+      if (p.state == PiggyState.leaving) continue;
+      s.add(p.piggyColor);
+    }
+    if (piggyQueue.isPuzzleMode) {
+      s.addAll(piggyQueue.poolNormalColors);
+    }
+    return s;
+  }
+
   Iterable<PiggyComponent> get _piggiesOnBelt => world.children
       .whereType<PiggyComponent>()
       .where((p) => p.state == PiggyState.onConveyor || p.state == PiggyState.shooting);
@@ -2213,9 +2230,21 @@ class BallComponent extends SpriteComponent {
 
   /// Painter: repaint every non-stone block in a (2*area+1) square around
   /// [target] to [color]. Target itself included.
+  ///
+  /// Aleksey fix 2026-08-26: если у игрока нет normal-piggy цвета
+  /// [color], красим в первый доступный playable-цвет — не даём создать
+  /// dead-color trap (см. converter).
   void _painterRepaint({required int area, required PiggyColor color}) {
     final board = _board;
     if (board == null) return;
+    var effectiveColor = color;
+    final game = _game;
+    if (game != null) {
+      final playable = game.playableNormalColors;
+      if (playable.isNotEmpty && !playable.contains(effectiveColor)) {
+        effectiveColor = playable.first;
+      }
+    }
     final gr = target.gridRow;
     final gc = target.gridCol;
     for (var dr = -area; dr <= area; dr++) {
@@ -2224,7 +2253,7 @@ class BallComponent extends SpriteComponent {
         final c = gc + dc;
         if (r < 0 || r >= board.cells.length) continue;
         if (c < 0 || c >= board.cells[r].length) continue;
-        board.cells[r][c]?.repaintTo(color);
+        board.cells[r][c]?.repaintTo(effectiveColor);
       }
     }
   }
@@ -2232,8 +2261,14 @@ class BallComponent extends SpriteComponent {
   /// Converter: pick 2-3 random colours from those alive on the board
   /// (fallback to piggy palette) and repaint every non-stone block to a
   /// random one from that set.
+  ///
+  /// Aleksey fix 2026-08-26: pool ограничен цветами, для которых у игрока
+  /// СЕЙЧАС есть normal-piggy с ammo>0 (на belt / waiting / в queue-pool).
+  /// Иначе конвертер создаёт dead-color trap — блоки перекрашены в цвет,
+  /// для которого пигов уже нет.
   void _converterShuffle() {
     final board = _board;
+    final game = _game;
     if (board == null) return;
     final rng = math.Random();
     final present = <PiggyColor>{};
@@ -2246,6 +2281,17 @@ class BallComponent extends SpriteComponent {
     }
     var pool = present.toList();
     if (pool.length < 2) pool = List<PiggyColor>.from(PiggyColor.values);
+
+    // Пересечение с «игровыми» цветами. Если ничего не пересеклось —
+    // fallback к present, чтобы converter не превращался в no-op.
+    if (game != null) {
+      final playable = game.playableNormalColors;
+      if (playable.isNotEmpty) {
+        final filtered = pool.where(playable.contains).toList();
+        if (filtered.isNotEmpty) pool = filtered;
+      }
+    }
+
     pool.shuffle(rng);
     final take = pool.length < 3 ? pool.length : (2 + rng.nextInt(2));
     final chosen = pool.take(take).toList();
@@ -2477,6 +2523,17 @@ class QueueComponent extends PositionComponent {
   /// Puzzle-only: true when the FIFO pool is fully drained. Used by the game
   /// end-of-level detector to decide when to fire the result overlay.
   bool get isArsenalExhausted => isPuzzleMode && _pool.isEmpty;
+
+  /// Colors of normal-type piggies still in the FIFO pool (puzzle mode).
+  /// Used by converter/painter — если у игрока нет piggies данного цвета
+  /// в очереди, красить блоки в этот цвет = dead-color trap.
+  Set<PiggyColor> get poolNormalColors {
+    final s = <PiggyColor>{};
+    for (final p in _pool) {
+      if (p.type == PiggyType.normal) s.add(p.color);
+    }
+    return s;
+  }
 
   @override
   Future<void> onLoad() async {
