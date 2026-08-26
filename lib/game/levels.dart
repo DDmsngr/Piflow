@@ -80,6 +80,15 @@ const List<WorldConfig> worlds = [
     lastLevel: 30,
     tagline: 'Спец-пиги: бомбы и реакции',
   ),
+  WorldConfig(
+    id: 'gridlab',
+    name: 'Grid Lab',
+    emoji: '🌌',
+    color: Color(0xFF6C4CFF),
+    firstLevel: 31,
+    lastLevel: 35,
+    tagline: 'Огромные поля, всё сразу',
+  ),
 ];
 
 /// Look up which world a level belongs to. Returns the first matching world

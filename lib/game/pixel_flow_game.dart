@@ -2419,11 +2419,13 @@ class BallComponent extends SpriteComponent {
     }
   }
 
-  /// Jackpot: 50% clear the whole board (stone excluded), 50% just pop target.
+  /// Jackpot: 25% clear the whole board (stone excluded), 75% just pop target.
+  /// Aleksey 2026-08-26: понижен с 50% до 25% — «5-ammo пиг снёс всё поле»
+  /// оказалось джекпотом, слишком часто выпадает эффект «I win».
   void _jackpotRoll() {
     final board = _board;
     if (board == null) return;
-    final lucky = math.Random().nextBool();
+    final lucky = math.Random().nextDouble() < 0.25;
     if (!lucky) {
       target.applyHit();
       return;

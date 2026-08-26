@@ -39,6 +39,9 @@ app.*.symbols
 # Obfuscation related
 app.*.map.json
 
+# Local sprite backup dir before autocrop (safe restore точка)
+assets/images/backup_orig/
+
 # Android release-signing — NEVER commit keystore or credentials
 android/key.properties
 android/*.p12
