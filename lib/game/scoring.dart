@@ -332,11 +332,11 @@ class EqualityScoringService {
     final failOverflow = cfg.failLaunchOverflow <= 0 ? 1 : cfg.failLaunchOverflow;
     final launchDev = (launchOverflow / failOverflow).clamp(0.0, 1.0);
 
-    // Hits: measured via unusedAmmo (leftover ammo on LAUNCHED piggies at
-    // level end). Un-launched piggies don't count — spared, not wasted.
-    // Normalised against targetHits so denominator scales with level size.
-    final hitsDenom = cfg.targetHits <= 0 ? 1 : cfg.targetHits;
-    final hitsDev = (stats.unusedAmmo / hitsDenom).clamp(0.0, 1.0);
+    // Hits: 2026-08-26 Aleksey flip — unusedAmmo больше НЕ штраф.
+    // Экономия ammo = ЭФФЕКТИВНОСТЬ (награда в RewardCalculator: +10 за
+    // каждый неиспользованный shot). Поэтому hitsDev всегда 0 —
+    // равенство по этой оси считается достигнутым по определению.
+    final hitsDev = 0.0;
 
     // Colors: symmetric difference vs allowed set, normalized by allowed size.
     // If allowedColors is empty, no color criterion — deviation 0.
@@ -426,12 +426,17 @@ class RankCalculator {
 class RewardCalculator {
   const RewardCalculator();
 
+  /// Bonus per unused ammo unit — экономия shots'ов = награда, не штраф
+  /// (Aleksey 2026-08-26).
+  static const double ammoBonusPerShot = 10.0;
+
   double compute({
     required LevelTargetConfig cfg,
     required double equalityScore,
     required int launchOverflow,
     required bool isPerfect,
     required bool isFailed,
+    required int unusedAmmo,
   }) {
     if (isFailed) return 0.0;
     // Smooth decay: par = 1.0, fail-boundary = 0.4 (never below — you did clear).
@@ -439,7 +444,9 @@ class RewardCalculator {
     final moveMul =
         (1 - (launchOverflow / failOverflow) * 0.6).clamp(0.4, 1.0);
     final perfectMul = isPerfect ? cfg.perfectBonusMultiplier : 1.0;
-    return cfg.baseScore * equalityScore * moveMul * perfectMul;
+    final base = cfg.baseScore * equalityScore * moveMul * perfectMul;
+    // Экономия ammo = чистый бонус поверх base-скора.
+    return base + unusedAmmo * ammoBonusPerShot;
   }
 }
 
@@ -471,7 +478,6 @@ class LevelScorer {
         !stats.cleared || launchOverflow >= cfg.failLaunchOverflow;
     final isPerfect = stats.cleared &&
         launchOverflow <= cfg.perfectLaunchTolerance &&
-        stats.unusedAmmo == 0 &&
         extra.isEmpty &&
         missing.isEmpty &&
         eq >= cfg.thresholds.perfectEquality;
@@ -515,6 +521,7 @@ class LevelScorer {
       launchOverflow: launchOverflow,
       isPerfect: isPerfect,
       isFailed: isFailed,
+      unusedAmmo: stats.unusedAmmo,
     );
 
     // Stars — Aleksey's 3-tier system (2026-08-12):
@@ -528,7 +535,8 @@ class LevelScorer {
     } else if (cfg.masteryChallenge != null) {
       stars = masteryPassed == true ? 3 : 2;
     } else {
-      stars = stats.unusedAmmo == 0 ? 3 : 2;
+      // Без mastery — 3★ за clear в par (уже прошли проверку launchOverflow>0 выше).
+      stars = 3;
     }
 
     return LevelResult(
@@ -599,11 +607,13 @@ class LevelScorer {
   ) {
     switch (kind) {
       case MasteryKind.noWastedShots:
-        // For 1-HP boards with normal piggies this collapses to unusedAmmo=0:
-        // every launched piggy emptied its ammo, spare piggies in the queue
-        // (never launched) don't count. Future levels with armor/specials
-        // may grow a separate wastedShots counter — this stays the umbrella.
-        return stats.unusedAmmo == 0;
+        // 2026-08-26 Aleksey flip — mastery «Экономия выстрелов» теперь
+        // считает сохранённые ammo плюсом, а не штрафом. Условие: игрок
+        // сохранил хотя бы 1 shot (обычно легко) ИЛИ clear уложился в
+        // par без overflow (тогда экономия неважна). Не выполняется
+        // только когда игрок потратил ВСЁ ammo И вышел за par — т.е.
+        // «в обрез», без запаса.
+        return stats.unusedAmmo >= 1 || launchOverflow == 0;
     }
   }
 
@@ -663,7 +673,7 @@ class DeviationBarModel {
         deviation: r.deviation.hits,
         hint: r.unusedAmmo == 0
             ? 'Всё ammo в дело'
-            : 'Впустую: ${r.unusedAmmo}',
+            : 'Экономия: ${r.unusedAmmo} (+${r.unusedAmmo * 10} очков)',
       ),
       _bar(
         label: 'Цвета',

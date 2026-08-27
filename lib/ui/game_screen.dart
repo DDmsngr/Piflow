@@ -911,11 +911,15 @@ class _StatsBlock extends StatelessWidget {
     final String masteryLabel;
     final String masteryStatus;
     if (r.masteryLabel != null && r.masteryPassed != null) {
-      masteryLabel = r.masteryLabel!;
+      // Переименовываем legacy label «Без лишних выстрелов» — теперь
+      // это «Экономия выстрелов» (сохранённые ammo = бонус, не штраф).
+      masteryLabel = r.masteryLabel == 'Без лишних выстрелов'
+          ? 'Экономия выстрелов'
+          : r.masteryLabel!;
       masteryStatus = r.masteryPassed! ? 'Выполнено' : 'Не выполнено';
     } else {
-      masteryLabel = 'Без лишних выстрелов';
-      masteryStatus = r.unusedAmmo == 0 ? 'Выполнено' : 'Не выполнено';
+      masteryLabel = 'Экономия выстрелов';
+      masteryStatus = r.unusedAmmo >= 1 ? 'Выполнено' : 'Не выполнено';
     }
 
     return Column(
@@ -930,8 +934,10 @@ class _StatsBlock extends StatelessWidget {
         _StatRow(
           label: 'Выстрелы',
           main: 'Использовано: ${r.shotsUsed}',
-          status: 'Осталось: ${r.unusedAmmo}',
-          ok: r.unusedAmmo == 0,
+          status: r.unusedAmmo > 0
+              ? 'Экономия: ${r.unusedAmmo} (+${r.unusedAmmo * 10} очков)'
+              : 'Всё в дело',
+          ok: true,
         ),
         _StatRow(
           label: 'Цвета',
@@ -1019,8 +1025,11 @@ class _GoalsBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final r = result;
-    final masteryLabel = r.masteryLabel ?? 'Без лишних выстрелов';
-    final masteryDone = r.masteryPassed ?? (r.unusedAmmo == 0);
+    final rawLabel = r.masteryLabel ?? 'Экономия выстрелов';
+    final masteryLabel = rawLabel == 'Без лишних выстрелов'
+        ? 'Экономия выстрелов'
+        : rawLabel;
+    final masteryDone = r.masteryPassed ?? (r.unusedAmmo >= 1);
     final items = <(String, bool)>[
       ('Уничтожить все кубики', r.checklist.cleared),
       ('Уложиться в ${r.movesTarget} ходов', r.launchOverflow <= 0),
