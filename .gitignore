@@ -41,6 +41,7 @@ app.*.map.json
 
 # Local sprite backup dir before autocrop (safe restore точка)
 assets/images/backup_orig/
+assets/images/backup_ref_recut/
 
 # Android release-signing — NEVER commit keystore or credentials
 android/key.properties

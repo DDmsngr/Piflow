@@ -244,7 +244,7 @@ class LevelConfig {
     this.ammoMin = 5,
     this.ammoMax = 25,
     this.spawnInterval = 0.9,
-    this.queueSlots = 3,
+    this.queueSlots = 6,
     this.waitingSlots = 5,
     this.piggySpeed = 195,
     // Aleksey 2026-08-21: до 5 piggies одновременно на belt. Если piggy
