@@ -86,7 +86,7 @@ const List<WorldConfig> worlds = [
     emoji: '🌌',
     color: Color(0xFF6C4CFF),
     firstLevel: 31,
-    lastLevel: 35,
+    lastLevel: 40,
     tagline: 'Огромные поля, всё сразу',
   ),
 ];
@@ -2808,5 +2808,310 @@ final List<LevelConfig> levels = [
     ],
     piggySpeed: 400,
     spawnInterval: 0.65,
+  ),
+
+  // L36 — 🕸 «Витражная мозаика» (Aleksey Grid Lab, 40×30, 29 pigs).
+  //
+  //   923 destructible + 0 stones. Portal-пар нет. Тройная симметрия:
+  //   рамка _g/_gy/_vo, ажурная орнаментация из _vo/_o, центральное
+  //   яйцо (top: _y+_g+_v+_c ядро, bottom: _v/_v2/_o лабиринт с _yg
+  //   вставками). Малые вкрапления _c/_pc/_p как «жемчуг».
+  //
+  //   Точный подсчёт shots per color:
+  //     C =   4 (_c) + 12×2 (_c2) + 2 (_pc) = 30
+  //     P =  28 (_p) + 4×2 (_p2) + 2 (_pc) = 38
+  //     Y = 183 (_y) + 55 (_yg outer) + 116 (_gy inner) = 354
+  //     G =  78 (_g) + 55 (_yg inner) + 116 (_gy outer) = 249
+  //     V =  50 (_v) + 50×2 (_v2) + 240 (_vo outer) = 390
+  //     O = 101 (_o) + 240 (_vo inner) = 341
+  //   Total = 1402 shots.
+  //
+  //   Portals: нет.
+  //   Par: 29 launches.
+  LevelConfig(
+    levelNumber: 36,
+    grid: [
+      [_g , _gy, _gy, _gy, _gy, _gy, _gy, _gy, _gy, _gy, _gy, _gy, _gy, _gy, _gy, _gy, _gy, _gy, _gy, _gy, _gy, _gy, _gy, _gy, _gy, _gy, _gy, _gy, _gy, _g ],
+      [_g , _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _g ],
+      [_g , _e , _e , _e , _vo, _vo, _e , _e , _e , _vo, _vo, _e , _e , _e , _vo, _vo, _e , _e , _e , _vo, _vo, _e , _e , _e , _vo, _vo, _e , _e , _e , _g ],
+      [_g , _e , _e , _vo, _vo, _e , _e , _o , _o , _e , _vo, _vo, _e , _e , _vo, _vo, _e , _e , _vo, _vo, _e , _o , _o , _e , _e , _vo, _vo, _e , _e , _g ],
+      [_g , _e , _e , _vo, _e , _e , _o , _p , _p , _o , _e , _vo, _e , _e , _vo, _vo, _e , _e , _vo, _e , _o , _p , _p , _o , _e , _e , _vo, _e , _e , _g ],
+      [_g , _g , _e , _vo, _e , _o , _p , _p , _p , _o , _e , _vo, _e , _e , _vo, _vo, _e , _e , _vo, _e , _o , _p , _p , _p , _o , _e , _vo, _e , _g , _g ],
+      [_gy, _g , _vo, _vo, _e , _o , _p , _pc, _p , _o , _e , _e , _vo, _vo, _vo, _vo, _vo, _vo, _e , _e , _o , _p , _pc, _p , _o , _e , _vo, _vo, _g , _gy],
+      [_gy, _g , _vo, _e , _e , _e , _o , _p , _p , _o , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _o , _p , _p , _o , _e , _e , _e , _vo, _g , _gy],
+      [_gy, _g , _vo, _vo, _e , _e , _e , _o , _o , _o , _o , _o , _o , _o , _o , _o , _o , _o , _o , _o , _o , _o , _o , _e , _e , _e , _vo, _vo, _g , _gy],
+      [_gy, _g , _e , _vo, _e , _e , _e , _e , _o , _y , _y , _y , _y , _y , _y , _y , _y , _y , _y , _y , _y , _o , _e , _e , _e , _e , _vo, _e , _g , _gy],
+      [_gy, _g , _e , _vo, _e , _e , _e , _o , _y , _y , _y , _y , _y , _y , _y , _y , _y , _y , _y , _y , _y , _y , _o , _e , _e , _e , _vo, _e , _g , _gy],
+      [_gy, _g , _e , _vo, _e , _e , _o , _y , _y , _g , _g , _g , _y , _y , _y , _y , _y , _y , _g , _g , _g , _y , _y , _o , _e , _e , _vo, _e , _g , _gy],
+      [_gy, _g , _vo, _vo, _e , _e , _o , _y , _y , _g , _c , _v , _y , _y , _y , _y , _y , _y , _v , _c , _g , _y , _y , _o , _e , _e , _vo, _vo, _g , _gy],
+      [_gy, _g , _vo, _e , _e , _e , _o , _y , _y , _g , _g , _g , _y , _y , _y , _y , _y , _y , _g , _g , _g , _y , _y , _o , _e , _e , _e , _vo, _g , _gy],
+      [_gy, _g , _vo, _c2, _c2, _c2, _o , _y , _y , _y , _y , _y , _y , _y , _p , _p , _y , _y , _y , _y , _y , _y , _y , _o , _c2, _c2, _c2, _vo, _g , _gy],
+      [_gy, _vo, _vo, _vo, _e , _e , _o , _y , _y , _y , _y , _y , _y , _y , _p , _p , _y , _y , _y , _y , _y , _y , _y , _o , _e , _e , _vo, _vo, _vo, _gy],
+      [_gy, _vo, _e , _c2, _c2, _c2, _e , _o , _y , _y , _y , _y , _y , _p , _y , _y , _p , _y , _y , _y , _y , _y , _o , _e , _c2, _c2, _c2, _e , _vo, _gy],
+      [_gy, _vo, _e , _e , _e , _e , _e , _o , _y , _y , _y , _y , _y , _y , _y , _y , _y , _y , _y , _y , _y , _y , _o , _e , _e , _e , _e , _e , _vo, _gy],
+      [_gy, _vo, _vo, _e , _e , _e , _e , _vo, _vo, _y , _y , _y , _y , _y , _y , _y , _y , _y , _y , _y , _y , _vo, _vo, _e , _e , _e , _e , _vo, _vo, _gy],
+      [_gy, _gy, _vo, _vo, _vo, _vo, _vo, _vo, _e , _o , _y , _y , _y , _y , _y , _y , _y , _y , _y , _y , _o , _e , _vo, _vo, _vo, _vo, _vo, _vo, _gy, _gy],
+      [_gy, _gy, _vo, _vo, _vo, _vo, _vo, _vo, _e , _e , _e , _p , _p , _p2, _p2, _p2, _p2, _p , _p , _e , _e , _e , _vo, _vo, _vo, _vo, _vo, _vo, _gy, _gy],
+      [_gy, _vo, _vo, _e , _e , _e , _e , _vo, _vo, _e , _o , _v2, _v , _y , _y , _y , _y , _y , _v , _o , _e , _vo, _vo, _e , _e , _e , _e , _vo, _vo, _gy],
+      [_gy, _vo, _e , _e , _e , _e , _e , _e , _e , _o , _v2, _v , _v2, _yg, _yg, _yg, _yg, _yg, _v2, _v , _o , _e , _e , _e , _e , _e , _e , _e , _vo, _gy],
+      [_gy, _vo, _e , _e , _e , _e , _e , _e , _o , _v2, _v , _v2, _y , _y , _y , _y , _y , _y , _y , _v2, _v , _o , _e , _e , _e , _e , _e , _e , _vo, _gy],
+      [_gy, _vo, _vo, _vo, _e , _e , _e , _o , _v2, _v , _v2, _v , _yg, _yg, _yg, _yg, _yg, _yg, _yg, _v , _v2, _v , _o , _e , _e , _e , _vo, _vo, _vo, _gy],
+      [_gy, _g , _vo, _e , _e , _e , _e , _o , _v , _v2, _v , _v2, _y , _y , _y , _y , _y , _y , _y , _v2, _v , _v2, _o , _e , _e , _e , _e , _vo, _g , _gy],
+      [_gy, _g , _vo, _e , _e , _e , _o , _v , _v2, _v , _v2, _yg, _yg, _yg, _yg, _yg, _yg, _yg, _yg, _yg, _v2, _v , _v2, _o , _e , _e , _e , _vo, _g , _gy],
+      [_gy, _g , _vo, _vo, _e , _e , _o , _v2, _v , _v2, _v , _y , _y , _y , _y , _y , _y , _y , _y , _y , _v , _v2, _v , _o , _e , _e , _vo, _vo, _g , _gy],
+      [_gy, _g , _e , _vo, _e , _o , _v2, _v , _v2, _v , _v2, _yg, _yg, _yg, _yg, _yg, _yg, _yg, _yg, _yg, _v2, _v , _v2, _v , _o , _o , _vo, _e , _g , _gy],
+      [_gy, _g , _e , _vo, _e , _o , _v , _v2, _v , _v2, _v , _y , _y , _y , _y , _y , _y , _y , _y , _y , _v , _v2, _v , _v2, _o , _o , _vo, _e , _g , _gy],
+      [_gy, _g , _e , _vo, _e , _o , _v2, _v , _v2, _v , _v2, _yg, _yg, _yg, _yg, _yg, _yg, _yg, _yg, _yg, _v2, _v , _v2, _v , _o , _e , _vo, _o , _g , _gy],
+      [_gy, _g , _vo, _vo, _e , _o , _v , _v2, _v , _v2, _v , _y , _y , _y , _y , _y , _y , _y , _y , _y , _v , _v2, _v , _v2, _o , _e , _vo, _vo, _g , _gy],
+      [_gy, _g , _vo, _e , _e , _e , _o , _v , _v2, _v , _v2, _yg, _yg, _yg, _yg, _yg, _yg, _yg, _yg, _yg, _v2, _v , _v2, _o , _e , _o , _o , _vo, _g , _gy],
+      [_gy, _g , _vo, _vo, _e , _e , _o , _v2, _v , _v2, _v , _y , _vo, _vo, _vo, _vo, _vo, _vo, _y , _y , _v , _v2, _v , _o , _o , _o , _vo, _vo, _g , _gy],
+      [_g , _g , _e , _vo, _e , _e , _e , _o , _v2, _v , _v2, _vo, _yg, _yg, _vo, _vo, _yg, _yg, _vo, _v , _v2, _v , _o , _o , _o , _e , _vo, _e , _g , _g ],
+      [_g , _e , _e , _vo, _e , _e , _e , _e , _o , _o , _c , _vo, _o , _y , _vo, _vo, _y , _o , _vo, _c , _o , _o , _e , _e , _e , _e , _vo, _e , _e , _g ],
+      [_g , _e , _e , _vo, _vo, _e , _e , _e , _e , _o , _vo, _vo, _v2, _yg, _vo, _vo, _yg, _yg, _vo, _vo, _o , _e , _e , _e , _e , _vo, _vo, _e , _e , _g ],
+      [_g , _e , _e , _e , _vo, _vo, _e , _e , _e , _vo, _vo, _e , _e , _e , _vo, _vo, _e , _e , _e , _vo, _vo, _e , _e , _e , _vo, _vo, _e , _e , _e , _g ],
+      [_g , _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _vo, _g ],
+      [_g , _gy, _gy, _gy, _gy, _gy, _gy, _gy, _gy, _gy, _gy, _gy, _gy, _gy, _gy, _gy, _gy, _gy, _gy, _gy, _gy, _gy, _gy, _gy, _gy, _gy, _gy, _gy, _gy, _g ],
+    ],
+    inventory: const [
+      PiggyBundle(color: PiggyColor.cyan,   ammo: 30), // C sum = 30 ✓
+      PiggyBundle(color: PiggyColor.pink,   ammo: 38), // P sum = 38 ✓
+      PiggyBundle(color: PiggyColor.orange, ammo: 50),
+      PiggyBundle(color: PiggyColor.purple, ammo: 50),
+      PiggyBundle(color: PiggyColor.yellow, ammo: 55),
+      PiggyBundle(color: PiggyColor.green,  ammo: 50),
+      PiggyBundle(color: PiggyColor.orange, ammo: 50),
+      PiggyBundle(color: PiggyColor.purple, ammo: 50),
+      PiggyBundle(color: PiggyColor.yellow, ammo: 55),
+      PiggyBundle(color: PiggyColor.green,  ammo: 50),
+      PiggyBundle(color: PiggyColor.orange, ammo: 50),
+      PiggyBundle(color: PiggyColor.purple, ammo: 50),
+      PiggyBundle(color: PiggyColor.yellow, ammo: 55),
+      PiggyBundle(color: PiggyColor.green,  ammo: 50),
+      PiggyBundle(color: PiggyColor.orange, ammo: 50),
+      PiggyBundle(color: PiggyColor.purple, ammo: 50),
+      PiggyBundle(color: PiggyColor.yellow, ammo: 55),
+      PiggyBundle(color: PiggyColor.green,  ammo: 50),
+      PiggyBundle(color: PiggyColor.orange, ammo: 50),
+      PiggyBundle(color: PiggyColor.purple, ammo: 50),
+      PiggyBundle(color: PiggyColor.yellow, ammo: 55),
+      PiggyBundle(color: PiggyColor.green,  ammo: 49), // G sum = 249 ✓
+      PiggyBundle(color: PiggyColor.orange, ammo: 50),
+      PiggyBundle(color: PiggyColor.purple, ammo: 50),
+      PiggyBundle(color: PiggyColor.yellow, ammo: 55),
+      PiggyBundle(color: PiggyColor.orange, ammo: 41), // O sum = 341 ✓
+      PiggyBundle(color: PiggyColor.purple, ammo: 50),
+      PiggyBundle(color: PiggyColor.yellow, ammo: 24), // Y sum = 354 ✓
+      PiggyBundle(color: PiggyColor.purple, ammo: 40), // V sum = 390 ✓
+    ],
+    targetLaunches: 29,
+    perfectLaunchTolerance: 0,
+    softLaunchTolerance: 5,
+    expectedCombos: 4,
+    masteryChallenge: MasteryChallenge.noWastedShots,
+    spawnPalette: const [
+      PiggyColor.cyan, PiggyColor.pink, PiggyColor.yellow,
+      PiggyColor.green, PiggyColor.orange, PiggyColor.purple,
+    ],
+    piggySpeed: 400,
+    spawnInterval: 0.65,
+  ),
+
+  // L37 — 🎈 «Гирлянда» (Aleksey Grid Lab, 40×30, 12 pigs).
+  //
+  //   511 destructible, только 3 цвета (G/V/P). Portal-пар нет.
+  //   Компактный узор в центре: верхний ромб с двумя _v/_p цветочными
+  //   вставками и нижняя каплевидная фигура. Простая палитра — уровень
+  //   на скорость.
+  //
+  //   Точный подсчёт shots per color:
+  //     G = 431 (_g), P = 8 (_p), V = 72 (_v). Total = 511.
+  //   Par: 12 launches.
+  LevelConfig(
+    levelNumber: 37,
+    grid: [
+      [_e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e ],
+      [_e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e ],
+      [_e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e ],
+      [_e , _e , _e , _e , _e , _e , _e , _e , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _e , _e , _e , _e , _e , _e , _e , _e , _e ],
+      [_e , _e , _e , _e , _e , _e , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _e , _e , _e , _e , _e , _e , _e , _e ],
+      [_e , _e , _e , _e , _e , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _e , _e , _e , _e , _e , _e , _e ],
+      [_e , _e , _e , _e , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _e , _e , _e , _e , _e , _e ],
+      [_e , _e , _e , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _e , _e , _e , _e , _e ],
+      [_e , _e , _e , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _e , _e , _e , _e , _e ],
+      [_e , _e , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _e , _e , _e , _e ],
+      [_e , _e , _g , _g , _g , _v , _v , _v , _v , _g , _g , _g , _g , _g , _g , _g , _g , _g , _v , _v , _v , _v , _g , _g , _g , _g , _e , _e , _e , _e ],
+      [_e , _e , _g , _g , _v , _v , _p , _p , _v , _v , _g , _g , _g , _g , _g , _g , _v , _v , _p , _p , _v , _v , _g , _g , _g , _g , _e , _e , _e , _e ],
+      [_e , _e , _g , _g , _v , _v , _p , _p , _v , _v , _v , _g , _g , _g , _g , _v , _v , _p , _p , _v , _v , _v , _g , _g , _g , _g , _e , _e , _e , _e ],
+      [_e , _e , _g , _g , _v , _v , _v , _v , _v , _v , _v , _g , _g , _g , _g , _v , _v , _v , _v , _v , _v , _v , _g , _g , _g , _g , _e , _e , _e , _e ],
+      [_e , _e , _e , _g , _g , _v , _v , _v , _v , _v , _v , _g , _g , _g , _g , _v , _v , _v , _v , _v , _v , _g , _g , _g , _g , _e , _e , _e , _e , _e ],
+      [_e , _e , _e , _g , _g , _g , _v , _v , _v , _v , _g , _g , _g , _g , _g , _g , _v , _v , _v , _v , _g , _g , _g , _g , _g , _e , _e , _e , _e , _e ],
+      [_e , _e , _e , _e , _g , _g , _g , _v , _v , _g , _g , _g , _g , _g , _g , _g , _g , _v , _v , _g , _g , _g , _g , _g , _e , _e , _e , _e , _e , _e ],
+      [_e , _e , _e , _e , _e , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _e , _e , _e , _e , _e , _e , _e ],
+      [_e , _e , _e , _e , _e , _e , _g , _g , _g , _g , _g , _v , _g , _g , _v , _g , _g , _g , _g , _g , _g , _e , _e , _e , _e , _e , _e , _e , _e , _e ],
+      [_e , _e , _e , _e , _e , _e , _e , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e ],
+      [_e , _e , _e , _e , _e , _e , _e , _e , _g , _g , _v , _v , _v , _v , _v , _v , _g , _g , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e ],
+      [_e , _e , _e , _e , _e , _e , _e , _e , _e , _g , _g , _g , _g , _g , _g , _g , _g , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e ],
+      [_e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _g , _g , _g , _g , _g , _g , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e ],
+      [_e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _g , _g , _g , _g , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e ],
+      [_e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _g , _g , _g , _g , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e ],
+      [_e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _g , _g , _g , _g , _g , _g , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e ],
+      [_e , _e , _e , _e , _e , _e , _e , _e , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e ],
+      [_e , _e , _e , _e , _e , _e , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e ],
+      [_e , _e , _e , _e , _e , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _e , _e , _e , _e , _e , _e , _e , _e , _e ],
+      [_e , _e , _e , _e , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _e , _e , _e , _e , _e , _e , _e , _e ],
+      [_e , _e , _e , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _e , _e , _e , _e , _e , _e , _e ],
+      [_e , _e , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _e , _e , _e , _e , _e , _e ],
+      [_e , _e , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _e , _e , _e , _e , _e , _e ],
+      [_e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e ],
+      [_e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e ],
+      [_e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e ],
+      [_e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e ],
+      [_e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e ],
+      [_e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e ],
+      [_e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e , _e ],
+    ],
+    inventory: const [
+      PiggyBundle(color: PiggyColor.green,  ammo: 48),
+      PiggyBundle(color: PiggyColor.purple, ammo: 36),
+      PiggyBundle(color: PiggyColor.green,  ammo: 48),
+      PiggyBundle(color: PiggyColor.purple, ammo: 36), // V sum = 72 ✓
+      PiggyBundle(color: PiggyColor.green,  ammo: 48),
+      PiggyBundle(color: PiggyColor.pink,   ammo:  8), // P sum = 8 ✓
+      PiggyBundle(color: PiggyColor.green,  ammo: 48),
+      PiggyBundle(color: PiggyColor.green,  ammo: 48),
+      PiggyBundle(color: PiggyColor.green,  ammo: 48),
+      PiggyBundle(color: PiggyColor.green,  ammo: 48),
+      PiggyBundle(color: PiggyColor.green,  ammo: 48),
+      PiggyBundle(color: PiggyColor.green,  ammo: 47), // G sum = 431 ✓
+    ],
+    targetLaunches: 12,
+    perfectLaunchTolerance: 0,
+    softLaunchTolerance: 2,
+    expectedCombos: 2,
+    masteryChallenge: MasteryChallenge.noWastedShots,
+    spawnPalette: const [
+      PiggyColor.green, PiggyColor.purple, PiggyColor.pink,
+    ],
+    piggySpeed: 400,
+    spawnInterval: 0.65,
+  ),
+
+  // L38 — 🕯 «Свеча ремесла» (Aleksey Grid Lab, 40×30, 39 pigs).
+  //
+  //   1194 destructible + 0 stones. **3 portal-пары** A/B/C.
+  //   Верхняя рамка _c2/_yg (крепкая), центр — большой _g/_cp монолит
+  //   с _v/_p/_v2 инкрустацией (два «цветка»), нижняя капля _cp+_ov
+  //   с _p2 контурами. Один из самых объёмных уровней.
+  //
+  //   Точный подсчёт shots per color:
+  //     C = 137×2 (_c2) + 277 (_cp outer) = 551
+  //     P =   5 (_p) + 138×2 (_p2) + 277 (_cp inner) = 558
+  //     Y =  83 (_yg outer) = 83
+  //     G = 418 (_g) + 83 (_yg inner) = 501
+  //     V =  77 (_v) + 3×2 (_v2) + 56 (_ov inner) = 139
+  //     O =  56 (_ov outer) = 56
+  //   Total = 1888 shots.
+  //
+  //   Portals:
+  //     _PA : (r=20,c=18) ↔ (r=39,c=7)
+  //     _PB : (r=12,c=7)  ↔ (r=39,c=24)
+  //     _PC : (r=11,c=19) ↔ (r=39,c=9)
+  //   Par: 39 launches. piggySpeed=380 (много pigs + большой grid).
+  LevelConfig(
+    levelNumber: 38,
+    grid: [
+      [_c2, _c2, _c2, _c2, _c2, _c2, _c2, _yg, _yg, _yg, _yg, _yg, _yg, _yg, _yg, _yg, _yg, _yg, _yg, _yg, _yg, _yg, _yg, _c2, _c2, _c2, _c2, _c2, _c2, _c2],
+      [_c2, _c2, _c2, _c2, _c2, _c2, _v , _v , _v , _yg, _yg, _yg, _yg, _yg, _yg, _yg, _yg, _yg, _yg, _yg, _yg, _yg, _yg, _c2, _c2, _c2, _c2, _c2, _c2, _c2],
+      [_c2, _c2, _c2, _c2, _c2, _v , _v , _yg, _yg, _yg, _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _yg, _yg, _yg, _yg, _yg, _c2, _c2, _c2, _c2, _c2],
+      [_c2, _c2, _c2, _c2, _v , _v , _yg, _yg, _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _yg, _yg, _yg, _yg, _yg, _yg, _c2, _c2, _c2, _c2],
+      [_c2, _c2, _c2, _c2, _v , _yg, _yg, _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _yg, _yg, _yg, _yg, _c2, _c2, _c2, _c2],
+      [_c2, _c2, _c2, _c2, _yg, _yg, _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _yg, _yg, _yg, _c2, _c2, _c2, _c2],
+      [_c2, _c2, _c2, _c2, _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _yg, _yg, _c2, _c2, _c2, _c2],
+      [_cp, _cp, _cp, _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _yg, _yg, _yg, _cp, _cp, _cp],
+      [_cp, _cp, _cp, _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _yg, _yg, _cp, _cp, _cp],
+      [_cp, _cp, _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _yg, _yg, _cp, _cp],
+      [_cp, _cp, _g , _g , _g , _v , _v2, _v , _v , _g , _g , _g , _g , _g , _g , _g , _g , _g , _v , _v2, _v , _v , _g , _g , _g , _g , _yg, _yg, _cp, _cp],
+      [_cp, _cp, _g , _g , _v , _v , _p , _p2, _v , _v , _g , _g , _g , _g , _g , _g , _v , _v , _p , _PC, _v , _v , _g , _g , _g , _g , _yg, _yg, _cp, _cp],
+      [_cp, _cp, _g , _g , _v , _v , _p , _PB, _v , _v , _v , _g , _g , _g , _g , _v , _v , _p , _p , _v , _v , _v , _g , _g , _g , _g , _yg, _yg, _cp, _cp],
+      [_cp, _cp, _g , _g , _v , _v , _v2, _v , _v , _v , _v , _g , _g , _g , _g , _v , _v , _v , _v , _v , _v , _v , _g , _g , _g , _g , _yg, _yg, _cp, _cp],
+      [_cp, _cp, _cp, _g , _g , _v , _v , _v , _v , _v , _v , _g , _g , _g , _g , _v , _v , _v , _v , _v , _v , _g , _g , _g , _g , _yg, _yg, _cp, _cp, _cp],
+      [_cp, _cp, _cp, _g , _g , _g , _v , _v , _v , _v , _g , _g , _g , _g , _g , _g , _v , _v , _v , _v , _g , _g , _g , _g , _g , _yg, _yg, _cp, _cp, _cp],
+      [_cp, _cp, _cp, _cp, _g , _g , _g , _v , _v , _g , _g , _g , _g , _g , _g , _g , _g , _v , _v , _g , _g , _g , _g , _g , _yg, _yg, _cp, _cp, _cp, _cp],
+      [_cp, _cp, _cp, _cp, _cp, _g , _g , _g , _cp, _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _cp, _g , _yg, _yg, _cp, _cp, _cp, _cp, _cp],
+      [_cp, _cp, _cp, _cp, _cp, _cp, _g , _cp, _cp, _g , _g , _v , _g , _g , _v , _g , _g , _g , _g , _g , _g , _cp, _cp, _yg, _cp, _cp, _cp, _cp, _cp, _cp],
+      [_cp, _cp, _cp, _cp, _cp, _cp, _cp, _cp, _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _p2, _p2, _cp, _cp, _cp, _cp, _cp, _cp, _cp, _cp],
+      [_cp, _cp, _cp, _cp, _cp, _cp, _cp, _cp, _g , _g , _v , _v , _v , _v , _v , _v , _g , _g , _PA, _p2, _p2, _p2, _cp, _cp, _cp, _cp, _cp, _cp, _cp, _cp],
+      [_cp, _cp, _cp, _cp, _cp, _cp, _cp, _cp, _cp, _g , _g , _g , _g , _g , _g , _g , _g , _p2, _p2, _p2, _p2, _cp, _cp, _cp, _cp, _cp, _cp, _cp, _cp, _cp],
+      [_cp, _cp, _cp, _cp, _cp, _cp, _cp, _cp, _cp, _cp, _g , _g , _g , _g , _g , _g , _p2, _p2, _p2, _p2, _cp, _cp, _cp, _cp, _cp, _cp, _cp, _cp, _cp, _cp],
+      [_cp, _cp, _cp, _cp, _cp, _cp, _cp, _cp, _cp, _cp, _cp, _g , _g , _g , _g , _p2, _p2, _p2, _p2, _cp, _cp, _cp, _cp, _cp, _cp, _cp, _cp, _cp, _cp, _cp],
+      [_cp, _cp, _cp, _cp, _cp, _cp, _cp, _cp, _cp, _cp, _cp, _g , _g , _g , _g , _p2, _p2, _p2, _p2, _cp, _cp, _cp, _cp, _cp, _cp, _cp, _cp, _cp, _cp, _cp],
+      [_cp, _cp, _cp, _cp, _cp, _cp, _cp, _cp, _cp, _cp, _g , _g , _g , _g , _g , _g , _p2, _p2, _p2, _p2, _p2, _cp, _cp, _cp, _cp, _cp, _cp, _cp, _cp, _cp],
+      [_cp, _cp, _cp, _cp, _cp, _cp, _cp, _cp, _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _p2, _p2, _p2, _p2, _cp, _cp, _cp, _cp, _cp, _cp, _cp, _cp],
+      [_cp, _cp, _cp, _cp, _cp, _cp, _cp, _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _p2, _p2, _p2, _p2, _cp, _cp, _cp, _cp, _cp, _cp, _cp],
+      [_cp, _cp, _cp, _cp, _cp, _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _p2, _p2, _p2, _p2, _cp, _cp, _cp, _cp, _cp],
+      [_cp, _cp, _cp, _cp, _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _p2, _p2, _p2, _p2, _cp, _cp, _cp, _cp],
+      [_cp, _cp, _cp, _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _p2, _p2, _p2, _p2, _cp, _cp, _cp],
+      [_cp, _cp, _cp, _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _p2, _p2, _p2, _p2, _cp, _cp],
+      [_cp, _cp, _cp, _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _g , _p2, _p2, _p2, _p2, _cp, _cp],
+      [_c2, _c2, _c2, _c2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _c2, _c2, _c2, _c2],
+      [_c2, _c2, _c2, _c2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _c2, _c2, _c2, _c2],
+      [_c2, _c2, _c2, _c2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _c2, _c2, _c2, _c2],
+      [_c2, _c2, _c2, _c2, _ov, _ov, _p2, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _p2, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _c2, _c2, _c2, _c2],
+      [_c2, _c2, _c2, _c2, _c2, _ov, _ov, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _p2, _ov, _ov, _ov, _ov, _ov, _ov, _p2, _p2, _c2, _c2, _c2, _c2, _c2],
+      [_c2, _c2, _c2, _c2, _c2, _c2, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _p2, _p2, _p2, _ov, _ov, _ov, _ov, _ov, _c2, _c2, _c2, _c2, _c2, _c2, _c2],
+      [_c2, _c2, _c2, _c2, _c2, _c2, _c2, _PA, _ov, _PC, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _ov, _c2, _PB, _c2, _c2, _c2, _c2, _c2],
+    ],
+    inventory: const [
+      PiggyBundle(color: PiggyColor.cyan,   ammo: 50),
+      PiggyBundle(color: PiggyColor.pink,   ammo: 50),
+      PiggyBundle(color: PiggyColor.green,  ammo: 50),
+      PiggyBundle(color: PiggyColor.purple, ammo: 46),
+      PiggyBundle(color: PiggyColor.yellow, ammo: 42),
+      PiggyBundle(color: PiggyColor.orange, ammo: 28),
+      PiggyBundle(color: PiggyColor.cyan,   ammo: 50),
+      PiggyBundle(color: PiggyColor.pink,   ammo: 50),
+      PiggyBundle(color: PiggyColor.green,  ammo: 50),
+      PiggyBundle(color: PiggyColor.purple, ammo: 46),
+      PiggyBundle(color: PiggyColor.yellow, ammo: 41), // Y sum = 83 ✓
+      PiggyBundle(color: PiggyColor.orange, ammo: 28), // O sum = 56 ✓
+      PiggyBundle(color: PiggyColor.cyan,   ammo: 50),
+      PiggyBundle(color: PiggyColor.pink,   ammo: 50),
+      PiggyBundle(color: PiggyColor.green,  ammo: 50),
+      PiggyBundle(color: PiggyColor.purple, ammo: 47), // V sum = 139 ✓
+      PiggyBundle(color: PiggyColor.cyan,   ammo: 50),
+      PiggyBundle(color: PiggyColor.pink,   ammo: 50),
+      PiggyBundle(color: PiggyColor.green,  ammo: 50),
+      PiggyBundle(color: PiggyColor.cyan,   ammo: 50),
+      PiggyBundle(color: PiggyColor.pink,   ammo: 50),
+      PiggyBundle(color: PiggyColor.green,  ammo: 50),
+      PiggyBundle(color: PiggyColor.cyan,   ammo: 50),
+      PiggyBundle(color: PiggyColor.pink,   ammo: 50),
+      PiggyBundle(color: PiggyColor.green,  ammo: 50),
+      PiggyBundle(color: PiggyColor.cyan,   ammo: 50),
+      PiggyBundle(color: PiggyColor.pink,   ammo: 50),
+      PiggyBundle(color: PiggyColor.green,  ammo: 50),
+      PiggyBundle(color: PiggyColor.cyan,   ammo: 50),
+      PiggyBundle(color: PiggyColor.pink,   ammo: 50),
+      PiggyBundle(color: PiggyColor.green,  ammo: 50),
+      PiggyBundle(color: PiggyColor.cyan,   ammo: 50),
+      PiggyBundle(color: PiggyColor.pink,   ammo: 50),
+      PiggyBundle(color: PiggyColor.green,  ammo: 50),
+      PiggyBundle(color: PiggyColor.cyan,   ammo: 50),
+      PiggyBundle(color: PiggyColor.pink,   ammo: 50),
+      PiggyBundle(color: PiggyColor.green,  ammo: 51), // G sum = 501 ✓
+      PiggyBundle(color: PiggyColor.cyan,   ammo: 51), // C sum = 551 ✓
+      PiggyBundle(color: PiggyColor.pink,   ammo: 58), // P sum = 558 ✓
+    ],
+    targetLaunches: 39,
+    perfectLaunchTolerance: 0,
+    softLaunchTolerance: 6,
+    expectedCombos: 5,
+    masteryChallenge: MasteryChallenge.noWastedShots,
+    spawnPalette: const [
+      PiggyColor.cyan, PiggyColor.pink, PiggyColor.yellow,
+      PiggyColor.green, PiggyColor.orange, PiggyColor.purple,
+    ],
+    piggySpeed: 380,
+    spawnInterval: 0.6,
   ),
 ];
