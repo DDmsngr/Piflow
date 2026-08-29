@@ -2419,13 +2419,15 @@ class BallComponent extends SpriteComponent {
     }
   }
 
-  /// Jackpot: 25% clear the whole board (stone excluded), 75% just pop target.
-  /// Aleksey 2026-08-26: понижен с 50% до 25% — «5-ammo пиг снёс всё поле»
-  /// оказалось джекпотом, слишком часто выпадает эффект «I win».
+  /// Jackpot: 30% clear the whole board (stone excluded), 70% just pop target.
+  /// Aleksey 2026-08-26: 50% → 25% («I win» слишком часто).
+  /// Aleksey 2026-08-29: 25% → 30% (после нескольких игр всё равно
+  /// «каждый раз срабатывает», хочется чуть больше вероятности победы
+  /// но не гарантированной).
   void _jackpotRoll() {
     final board = _board;
     if (board == null) return;
-    final lucky = math.Random().nextDouble() < 0.25;
+    final lucky = math.Random().nextDouble() < 0.30;
     if (!lucky) {
       target.applyHit();
       return;
